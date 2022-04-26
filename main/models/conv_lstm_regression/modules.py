@@ -231,7 +231,7 @@ class ConvLSTM(nn.Module):
 
 
 class EncoderDecoderConvLSTM(nn.Module):
-    def __init__(self, params, nf=8):
+    def __init__(self, params, nf=32):
         super(EncoderDecoderConvLSTM, self).__init__()
 
         self.params = params
@@ -260,14 +260,18 @@ class EncoderDecoderConvLSTM(nn.Module):
             input_dim=nf, hidden_dim=nf, kernel_size=(3, 3), bias=True
         )
 
-        self.decoder_CNN = nn.Conv3d(
+        self.decoder_CNN = nn.Sequential(
+            nn.Conv3d(
             in_channels=nf,
             out_channels=1,
             kernel_size=(1, 3, 3),
             padding=(0, 1, 1),
-        )
+            )
+     
 
-        self.gaussian_noise = GaussianNoise(0.0001)
+        )
+        
+        self.gaussian_noise = GaussianNoise(0.001)
 
     def autoencoder(
         self, x, seq_len, future_step, h_t, c_t, h_t2, c_t2, h_t3, c_t3, h_t4, c_t4
@@ -314,6 +318,8 @@ class EncoderDecoderConvLSTM(nn.Module):
         future_seq = self.params.in_seq_len
 
         x = x.unsqueeze(2)
+
+
         """
         Parameters
         ----------
@@ -324,7 +330,9 @@ class EncoderDecoderConvLSTM(nn.Module):
         # ipdb.set_trace()
 
         # find size of different input dimensions
+
         x = self.gaussian_noise(x)
+        
         b, seq_len, _, h, w = x.size()
 
         # initialize hidden states
