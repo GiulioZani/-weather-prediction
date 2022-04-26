@@ -3,7 +3,8 @@ import torch
 import torch.nn as nn
 import torch as t
 
-from gan.models_components.conv2dmodel import GaussianNoise
+from main.models.conv.model import GaussianNoise
+
 
 
 class ConvLSTMCell(nn.Module):
@@ -234,7 +235,7 @@ class EncoderDecoderConvLSTM(nn.Module):
         super(EncoderDecoderConvLSTM, self).__init__()
 
         self.params = params
-        in_chan = params.n_channels
+        in_chan = 1
         """ ARCHITECTURE 
 
         # Encoder (ConvLSTM)
@@ -261,7 +262,7 @@ class EncoderDecoderConvLSTM(nn.Module):
 
         self.decoder_CNN = nn.Conv3d(
             in_channels=nf,
-            out_channels=in_chan,
+            out_channels=1,
             kernel_size=(1, 3, 3),
             padding=(0, 1, 1),
         )
@@ -308,7 +309,11 @@ class EncoderDecoderConvLSTM(nn.Module):
 
     def forward(self, x):
 
+        # ipdb.set_trace()
+
         future_seq = self.params.in_seq_len
+
+        x = x.unsqueeze(2)
         """
         Parameters
         ----------

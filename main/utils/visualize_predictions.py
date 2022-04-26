@@ -14,6 +14,7 @@ class Bunch(dict):
 
 
 def visualize_predictions(x, y, preds, *, epoch=1, path="", show_plot=False):
+    return
     ch_idx = 1
     x = x[:, :, ch_idx]
     y = y[:, :, ch_idx]
