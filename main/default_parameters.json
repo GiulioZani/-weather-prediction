@@ -1,6 +1,6 @@
 {
 	"cuda": true,
-	"train_batch_size": 6,
+	"train_batch_size": 16,
 	"test_batch_size": 50,
 	"imsize": 64, 
 	"n_channels": 4,  
@@ -13,7 +13,7 @@
 	"gaussian_noise_std": 0.1,
 	"in_seq_len": 5,
 	"out_seq_len": 5,
-	"max_epochs": 100,
+	"max_epochs": 5,
 	"early_stopping_patience": 5,
 	"reduce_lr_on_plateau_patience": 5,
 	"data_location": "dataset/data.mat",

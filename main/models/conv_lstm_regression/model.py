@@ -1,8 +1,9 @@
 from main.base_lightning_modules.base_model import BaseModel
-from main.models.conv_lstm.old_model import EncoderDecoderConvLSTM
 from argparse import ArgumentParser
 import torch.nn.functional as F
 import torch as t
+
+from main.models.conv_lstm_regression.modules import EncoderDecoderConvLSTM
 
 
 class Model(BaseModel):
