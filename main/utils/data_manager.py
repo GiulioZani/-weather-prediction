@@ -7,7 +7,7 @@ class DataManager:
     def __init__(self, *, data: t.Tensor, norm_type="minmax"):
         self.norm_type = norm_type
         flattened_data = data.reshape(-1, 5).float()
-        device = t.device('cuda' if t.cuda.is_available() else 'cpu')
+        device = t.device("cuda" if t.cuda.is_available() else "cpu")
         self.min = flattened_data.min(dim=0)[0][None, None, :].to(device)
         self.max = flattened_data.max(dim=0)[0][None, None, :].to(device)
         self.var = t.var(flattened_data, dim=0)[None, None, :].to(device)

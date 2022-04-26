@@ -6,7 +6,6 @@ import torch as t
 from main.models.conv.model import GaussianNoise
 
 
-
 class ConvLSTMCell(nn.Module):
     def __init__(self, input_dim, hidden_dim, kernel_size, bias):
         """
@@ -262,15 +261,13 @@ class EncoderDecoderConvLSTM(nn.Module):
 
         self.decoder_CNN = nn.Sequential(
             nn.Conv3d(
-            in_channels=nf,
-            out_channels=1,
-            kernel_size=(1, 3, 3),
-            padding=(0, 1, 1),
+                in_channels=nf,
+                out_channels=1,
+                kernel_size=(1, 3, 3),
+                padding=(0, 1, 1),
             )
-     
-
         )
-        
+
         self.gaussian_noise = GaussianNoise(0.001)
 
     def autoencoder(
@@ -319,7 +316,6 @@ class EncoderDecoderConvLSTM(nn.Module):
 
         x = x.unsqueeze(2)
 
-
         """
         Parameters
         ----------
@@ -332,7 +328,7 @@ class EncoderDecoderConvLSTM(nn.Module):
         # find size of different input dimensions
 
         x = self.gaussian_noise(x)
-        
+
         b, seq_len, _, h, w = x.size()
 
         # initialize hidden states

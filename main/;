@@ -21,12 +21,7 @@ def run():
     parser.add_argument(
         "action",
         help="train or test the model",
-        choices=(
-            "train",
-            "test",
-            "restart",
-            "merge-results",
-        ),  # TODO: add merge-results
+        choices=("train", "test", "restart", "merge-results"),  # TODO: add merge-results
     )
     for key, value in default_params.items():
         parser.add_argument(
@@ -52,28 +47,15 @@ def run():
     with open(os.path.join(save_path, "train_params.json"), "w") as f:
         json.dump(training_dict, f, indent=4)
     import re
-
-    checkpoint_files = sorted(
-        tuple(
-            (fn, int(re.findall(r"\d+", fn)[0]))
-            for fn in os.listdir(save_path)
-            if fn.endswith(".ckpt")
-        ),
-        key=lambda x: x[1],
-        reverse=True,
-    )
-    checkpoint_path = (
-        os.path.join(save_path, checkpoint_files[0][0])
-        if len(checkpoint_files) > 0
-        else None
-    )
+    checkpoint_files = tuple((fn, int(re.findall(r'\d+', fn))) for fn in os.listdir(save_path) if fn.endswith('.ckpt'))
+    ipdb.set_trace()
+    checkpoint_path = os.path.join(save_path, checkpoint_files[0]) if len(checkpoint_files) > 0 else None
     checkpoint_callback = ModelCheckpoint(dirpath=save_path)
     trainer = Trainer(
         max_epochs=params.max_epochs,
         gpus=(1 if params.cuda else None),
         callbacks=[
-            EarlyStopping(monitor="val_mse", patience=params.early_stopping_patience),
-            checkpoint_callback,
+            EarlyStopping(monitor="val_mse", patience=params.early_stopping_patience), checkpoint_callback
         ],
         logger=logger_module.CustomLogger(params),
     )

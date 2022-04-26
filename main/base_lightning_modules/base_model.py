@@ -33,11 +33,13 @@ class BaseModel(LightningModule):
 
         pred_y = self(x)
         se = F.mse_loss(pred_y, y, reduction="sum")
-        denorm_pred_y = self.params.data_manager.denormalize(pred_y)#, self.device)
-        denorm_y = self.params.data_manager.denormalize(y)#, self.device)
+        denorm_pred_y = self.params.data_manager.denormalize(pred_y)  # , self.device)
+        denorm_y = self.params.data_manager.denormalize(y)  # , self.device)
         ae = F.l1_loss(denorm_pred_y, denorm_y, reduction="sum")
-        mask_pred_y = self.params.data_manager.discretize(denorm_pred_y)#, self.device)
-        mask_y = self.params.data_manager.discretize(denorm_y)#, self.device)
+        mask_pred_y = self.params.data_manager.discretize(
+            denorm_pred_y
+        )  # , self.device)
+        mask_y = self.params.data_manager.discretize(denorm_y)  # , self.device)
         tn, fp, fn, tp = t.bincount(
             mask_y.flatten() * 2 + mask_pred_y.flatten(), minlength=4,
         )
