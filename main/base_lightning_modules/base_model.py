@@ -9,6 +9,7 @@ class BaseModel(LightningModule):
     def __init__(self, params: Namespace):
         super().__init__()
         self.params = params
+        self.save_hyperparameters()
         # self.data_manager = DataManger(data_path=params.data_location)
         self.generator = t.nn.Sequential()
 

@@ -1,6 +1,6 @@
 {
 	"cuda": true,
-	"train_batch_size": 16,
+	"train_batch_size": 10,
 	"test_batch_size": 50,
 	"imsize": 64, 
 	"n_channels": 4,  
