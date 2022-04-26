@@ -4,7 +4,7 @@ import torch as t
 import json
 import ipdb
 from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import EarlyStopping
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 
 
 def run():
@@ -21,7 +21,7 @@ def run():
     parser.add_argument(
         "action",
         help="train or test the model",
-        choices=["train", "test", "merge-results"],  # TODO: add merge-results
+        choices=("train", "test", "restart", "merge-results"),  # TODO: add merge-results
     )
     for key, value in default_params.items():
         parser.add_argument(
@@ -46,23 +46,26 @@ def run():
     print("Training")
     with open(os.path.join(save_path, "train_params.json"), "w") as f:
         json.dump(training_dict, f, indent=4)
+    checkpoint_files = tuple(fn for fn in os.listdir(save_path) if fn.endswith('.ckpt'))
+    checkpoint_path = os.path.join(save_path, checkpoint_files[0]) if len(checkpoint_files) > 0 else None
+    checkpoint_callback = ModelCheckpoint(dirpath=save_path)
     trainer = Trainer(
         max_epochs=params.max_epochs,
         gpus=(1 if params.cuda else None),
         callbacks=[
-            EarlyStopping(monitor="val_mse", patience=params.early_stopping_patience)
+            EarlyStopping(monitor="val_mse", patience=params.early_stopping_patience), checkpoint_callback
         ],
         logger=logger_module.CustomLogger(params),
     )
     data_module = data_loader_module.CustomDataModule(params)
-    model_path = os.path.join(save_path, "model.pt")
-    if params.action == "train":
+    if params.action in ("restart", "test"):
+        if checkpoint_path is not None:
+            print(f"\nLoading model from checkpoint:'{checkpoint_path}'\n")
+            model.load_from_checkpoint(checkpoint_path)
+        else:
+            raise Exception("No checkpoint found. You must train the model first!")
+    if params.action in ("train", "restart"):
         trainer.fit(model=model, datamodule=data_module)
-        t.save(model.state_dict(), model_path)
-
-    if os.path.exists(model_path):
-        print(f"\nLoading model from '{model_path}'\n")
-        model.load_state_dict(t.load(model_path))
     trainer.test(model=model, datamodule=data_module)
 
 
