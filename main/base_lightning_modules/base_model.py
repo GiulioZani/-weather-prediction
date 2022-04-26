@@ -2,7 +2,7 @@ from pytorch_lightning import LightningModule
 import torch as t
 import torch.nn.functional as F
 from argparse import Namespace
-from .utils.visualize_predictions import visualize_predictions
+from ..utils.visualize_predictions import visualize_predictions
 
 
 class BaseModel(LightningModule):
@@ -24,7 +24,6 @@ class BaseModel(LightningModule):
         loss = F.mse_loss(pred_y, y)
         self.log("val_mse", loss, prog_bar=True)
         return {"val_mse": loss}
-
 
     def test_step(self, batch: tuple[t.Tensor, t.Tensor], batch_idx: int):
         x, y = batch

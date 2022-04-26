@@ -13,9 +13,7 @@ class Model(BaseModel):
     def loss(self, x, y):
         return F.mse_loss(x, y)
 
-    def training_step(
-        self, batch: tuple[t.Tensor, t.Tensor], batch_idx: int
-    ):
+    def training_step(self, batch: tuple[t.Tensor, t.Tensor], batch_idx: int):
         x, y = batch
         y_pred = self(x)
         loss = self.loss(y_pred, y)

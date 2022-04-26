@@ -7,7 +7,7 @@ import ipdb
 from argparse import Namespace
 
 
-class GANLogger(LightningLoggerBase):
+class CustomLogger(LightningLoggerBase):
     def __init__(
         self,
         params: Namespace,

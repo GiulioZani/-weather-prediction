@@ -39,9 +39,7 @@ def run():
     data_loader_module = __import__(
         f"{cur_folder}.data_loader", fromlist=["data_loader"]
     )
-    logger_module = __import__(
-        f"{cur_folder}.logger", fromlist=["logger"]
-    )
+    logger_module = __import__(f"{cur_folder}.logger", fromlist=["logger"])
     model = model_module.Model(params)
     save_path = os.path.join(cur_folder, "models", params.model)
     params.save_path = save_path

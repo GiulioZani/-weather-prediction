@@ -13,16 +13,16 @@ import scipy.io
 class CustomDataModule(LightningDataModule):
     def __init__(self, params):
         super().__init__()
-        dataset = t.from_numpy(scipy.io.loadmat('dataset/data.mat')['X'])
+        raw_dataset = t.from_numpy(scipy.io.loadmat(params.data_location)["X"]).float()
         self.params = params
-        self.params.data_manager = DataManager(data=dataset)
-        self.test_set = t.from_numpy(dataset[-168:]).float()
-        self.train_set = t.from_numpy(dataset[:-168]).float()
+        self.params.data_manager = DataManager(data=raw_dataset)
+        dataset = self.params.data_manager.normalize(raw_dataset)
+        self.test_set = dataset[-168:]
+        self.train_set = dataset[:-168]
         self.train_batch_size = params.train_batch_size
         self.test_batch_size = params.test_batch_size
         self.in_seq_len = params.in_seq_len
         self.out_seq_len = params.out_seq_len
-
 
     def train_dataloader(self):
         # creates a DeepCoastalDataset object
@@ -30,6 +30,7 @@ class CustomDataModule(LightningDataModule):
             self.train_set,
             in_seq_len=self.in_seq_len,
             out_seq_len=self.out_seq_len,
+            augment=True,
         )
         return DataLoader(
             dataset, batch_size=self.train_batch_size, drop_last=True, num_workers=3,
@@ -38,9 +39,7 @@ class CustomDataModule(LightningDataModule):
     def val_dataloader(self):
         # creates a DeepCoastalDataset object
         dataset = CustomDataset(
-            self.test_set,
-            in_seq_len=self.in_seq_len,
-            out_seq_len=self.out_seq_len,
+            self.test_set, in_seq_len=self.in_seq_len, out_seq_len=self.out_seq_len,
         )
         return DataLoader(
             dataset, batch_size=self.train_batch_size, drop_last=True, num_workers=3,
@@ -49,9 +48,7 @@ class CustomDataModule(LightningDataModule):
     def test_dataloader(self):
         # creates a DeepCoastalDataset object
         dataset = CustomDataset(
-            self.test_set,
-            in_seq_len=self.in_seq_len,
-            out_seq_len=self.out_seq_len,
+            self.test_set, in_seq_len=self.in_seq_len, out_seq_len=self.out_seq_len,
         )
         return DataLoader(
             dataset, batch_size=self.train_batch_size, drop_last=True, num_workers=3,
@@ -61,19 +58,21 @@ class CustomDataModule(LightningDataModule):
 class CustomDataset(Dataset):
     def __init__(
         self,
-        data:t.Tensor,
+        data: t.Tensor,
         in_seq_len: int = 4,
         out_seq_len: int = 4,
+        augment: bool = False,
     ):
         self.in_seq_len = in_seq_len
         self.out_seq_len = out_seq_len
         tot_lenght = self.in_seq_len + self.out_seq_len
         data = data[: (len(data) // tot_lenght) * tot_lenght]
-        segments = t.stack(
-            tuple(
-                data[i : i + tot_lenght]
-                for i in range(len(data) - tot_lenght)
+        segments = (
+            t.stack(
+                tuple(data[i : i + tot_lenght] for i in range(len(data) - tot_lenght))
             )
+            if augment
+            else data.reshape(-1, tot_lenght, data.shape[1], data.shape[2])
         )
         self.data = segments
 

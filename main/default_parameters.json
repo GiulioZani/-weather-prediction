@@ -16,6 +16,6 @@
 	"max_epochs": 100,
 	"early_stopping_patience": 5,
 	"reduce_lr_on_plateau_patience": 5,
-	"data_location": "./datasets/4ch_coastal_normalization.h5",
+	"data_location": "dataset/data.mat",
 	"crop":64
 }
