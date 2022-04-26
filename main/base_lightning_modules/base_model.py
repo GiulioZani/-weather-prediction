@@ -3,6 +3,7 @@ import torch as t
 import torch.nn.functional as F
 from argparse import Namespace
 from ..utils.visualize_predictions import visualize_predictions
+import ipdb
 
 
 class BaseModel(LightningModule):
@@ -12,9 +13,16 @@ class BaseModel(LightningModule):
         self.save_hyperparameters()
         # self.data_manager = DataManger(data_path=params.data_location)
         self.generator = t.nn.Sequential()
+        self.loss = t.nn.MSELoss()
 
     def forward(self, z: t.Tensor) -> t.Tensor:
         return self.generator(z)
+
+    def training_step(self, batch: tuple[t.Tensor, t.Tensor], batch_idx: int):
+        x, y = batch
+        y_pred = self(x)
+        loss = self.loss(y_pred, y)
+        return loss
 
     def validation_step(self, batch: tuple[t.Tensor, t.Tensor], batch_idx: int):
         x, y = batch
@@ -28,22 +36,25 @@ class BaseModel(LightningModule):
 
     def test_step(self, batch: tuple[t.Tensor, t.Tensor], batch_idx: int):
         x, y = batch
+        
         if batch_idx == 0:
             visualize_predictions(x, y, self(x), path=self.params.save_path)
 
         pred_y = self(x)
-        se = F.mse_loss(pred_y, y, reduction="sum")
+        y_single = y[:, :, -1, 2]
+        pred_y_single = pred_y[:, :, -1, 2]
+        se = F.mse_loss(pred_y_single, y_single, reduction="sum")
         denorm_pred_y = self.params.data_manager.denormalize(pred_y)  # , self.device)
         denorm_y = self.params.data_manager.denormalize(y)  # , self.device)
-        ae = F.l1_loss(denorm_pred_y, denorm_y, reduction="sum")
+        ae = F.l1_loss(denorm_pred_y[:, :, -1, 2], denorm_y[:, :, -1, 2], reduction="sum")
         mask_pred_y = self.params.data_manager.discretize(
             denorm_pred_y
         )  # , self.device)
         mask_y = self.params.data_manager.discretize(denorm_y)  # , self.device)
         tn, fp, fn, tp = t.bincount(
-            mask_y.flatten() * 2 + mask_pred_y.flatten(), minlength=4,
+            mask_y[:, :, -1, 2].flatten() * 2 + mask_pred_y[:, :, -1, 2].flatten(), minlength=4,
         )
-        total_lengh = mask_y.numel()
+        total_lengh = mask_y[:, :, -1, 2].numel()
         return {
             "se": se,
             "ae": ae,
@@ -53,6 +64,9 @@ class BaseModel(LightningModule):
             "tp": tp,
             "total_lengh": total_lengh,
         }
+
+    def configure_optimizers(self):
+        return t.optim.Adam(self.parameters(), lr=self.params.lr)
 
     def test_epoch_end(self, outputs):
         total_lenght = sum([x["total_lengh"] for x in outputs])

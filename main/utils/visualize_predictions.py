@@ -14,11 +14,6 @@ class Bunch(dict):
 
 
 def visualize_predictions(x, y, preds, *, epoch=1, path="", show_plot=False):
-    return
-    ch_idx = 1
-    x = x[:, :, ch_idx]
-    y = y[:, :, ch_idx]
-    preds = preds[:, :, ch_idx]
     if path != "" and not os.path.exists(path):
         os.mkdir(path)
     to_plot = [x[0], y[0].squeeze(1), preds[0]]

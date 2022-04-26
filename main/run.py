@@ -62,6 +62,8 @@ def run():
         key=lambda x: x[1],
         reverse=True,
     )
+    for fn, epoch in checkpoint_files[1:]:
+        os.remove(os.path.join(save_path, fn))
     checkpoint_path = (
         os.path.join(save_path, checkpoint_files[0][0])
         if len(checkpoint_files) > 0
