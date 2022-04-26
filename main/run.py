@@ -5,10 +5,8 @@ import json
 import ipdb
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import EarlyStopping
-from .data_loader import DeepCoastalDataModule
-from .gan_logger import GANLogger
 
-# in the main function if parses the arguments and initializes the appropiate models
+
 def run():
     current_dir = os.path.dirname(os.path.realpath(__file__))
     with open(os.path.join(current_dir, "default_parameters.json")) as f:
@@ -35,10 +33,16 @@ def run():
     }
     print(json.dumps(training_dict, indent=4))
     cur_folder = os.path.basename(os.path.dirname(__file__))
-    module = __import__(
+    model_module = __import__(
         f"{cur_folder}.models.{params.model}.model", fromlist=["models"]
     )
-    model = module.Model(params)
+    data_loader_module = __import__(
+        f"{cur_folder}.data_loader", fromlist=["data_loader"]
+    )
+    logger_module = __import__(
+        f"{cur_folder}.logger", fromlist=["logger"]
+    )
+    model = model_module.Model(params)
     save_path = os.path.join(cur_folder, "models", params.model)
     params.save_path = save_path
     print("Training")
@@ -50,9 +54,9 @@ def run():
         callbacks=[
             EarlyStopping(monitor="val_mse", patience=params.early_stopping_patience)
         ],
-        logger=GANLogger(params),
+        logger=logger_module.CustomLogger(params),
     )
-    data_module = DeepCoastalDataModule(params)
+    data_module = data_loader_module.CustomDataModule(params)
     model_path = os.path.join(save_path, "model.pt")
     if params.action == "train":
         trainer.fit(model=model, datamodule=data_module)

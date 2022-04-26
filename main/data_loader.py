@@ -6,27 +6,30 @@ from tqdm import tqdm
 import h5py
 from torch.utils.data import DataLoader, Dataset
 from pytorch_lightning import LightningDataModule
-from .utils.data_manager import DataManger
+from .utils.data_manager import DataManager
+import scipy.io
 
 
-class DeepCoastalDataModule(LightningDataModule):
+class CustomDataModule(LightningDataModule):
     def __init__(self, params):
         super().__init__()
-        self.data_location = params.data_location
+        dataset = t.from_numpy(scipy.io.loadmat('dataset/data.mat')['X'])
+        self.params = params
+        self.params.data_manager = DataManager(data=dataset)
+        self.test_set = t.from_numpy(dataset[-168:]).float()
+        self.train_set = t.from_numpy(dataset[:-168]).float()
         self.train_batch_size = params.train_batch_size
         self.test_batch_size = params.test_batch_size
         self.in_seq_len = params.in_seq_len
         self.out_seq_len = params.out_seq_len
-        self.crop = params.crop
+
 
     def train_dataloader(self):
         # creates a DeepCoastalDataset object
-        dataset = DeepCoastalDataset(
-            self.data_location,
-            train=True,
+        dataset = CustomDataset(
+            self.train_set,
             in_seq_len=self.in_seq_len,
             out_seq_len=self.out_seq_len,
-            crop=self.crop,
         )
         return DataLoader(
             dataset, batch_size=self.train_batch_size, drop_last=True, num_workers=3,
@@ -34,12 +37,10 @@ class DeepCoastalDataModule(LightningDataModule):
 
     def val_dataloader(self):
         # creates a DeepCoastalDataset object
-        dataset = DeepCoastalDataset(
-            self.data_location,
-            train=False,
+        dataset = CustomDataset(
+            self.test_set,
             in_seq_len=self.in_seq_len,
             out_seq_len=self.out_seq_len,
-            crop=self.crop,
         )
         return DataLoader(
             dataset, batch_size=self.train_batch_size, drop_last=True, num_workers=3,
@@ -47,42 +48,30 @@ class DeepCoastalDataModule(LightningDataModule):
 
     def test_dataloader(self):
         # creates a DeepCoastalDataset object
-        dataset = DeepCoastalDataset(
-            self.data_location,
-            train=False,
+        dataset = CustomDataset(
+            self.test_set,
             in_seq_len=self.in_seq_len,
             out_seq_len=self.out_seq_len,
-            crop=self.crop,
         )
         return DataLoader(
             dataset, batch_size=self.train_batch_size, drop_last=True, num_workers=3,
         )
 
 
-class DeepCoastalDataset(Dataset):
+class CustomDataset(Dataset):
     def __init__(
         self,
-        data_location: str = "../datasets/4ch_coastal_normalization.h5",
+        data:t.Tensor,
         in_seq_len: int = 4,
         out_seq_len: int = 4,
-        train: bool = True,
-        crop: int = 64,
     ):
-        self.data_location = data_location
-        self.train = train
-        self.crop = crop
-        with h5py.File(data_location, "r") as f:
-            data_manager = DataManger(ranges=f["ranges"])
-            raw_data = t.from_numpy(f["train" if "train" else "test"][:]).float()
-            data = data_manager.normalize(raw_data)
-        # augments the data by creating a list of overlapping segments
         self.in_seq_len = in_seq_len
         self.out_seq_len = out_seq_len
         tot_lenght = self.in_seq_len + self.out_seq_len
         data = data[: (len(data) // tot_lenght) * tot_lenght]
         segments = t.stack(
             tuple(
-                data[i : i + tot_lenght, :, :crop, :crop]
+                data[i : i + tot_lenght]
                 for i in range(len(data) - tot_lenght)
             )
         )

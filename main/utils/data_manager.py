@@ -3,28 +3,30 @@ import torch as t
 import ipdb
 
 
-class DataManger:
-    def __init__(self, *, data_path=None, ranges=None):
-        if data_path is not None:
-            self.ranges = t.from_numpy(h5py.File(data_path, "r")["ranges"][...])
-        elif ranges is not None:
-            self.ranges = ranges
-        else:
-            raise ValueError("data_path or ranges must be specified")
+class DataManager:
+    def __init__(self, *, data:t.Tensor, norm_type='minmax'):
+        self.norm_type = norm_type
+        flattened_data = data.reshape(-1, 5).float()
+        self.min = flattened_data.min(dim=0)[0][None, None, :]
+        self.max = flattened_data.max(dim=0)[0][None, None, :]
+        self.var = t.var(flattened_data, dim=0)[None, None, :]
+        self.mean = t.mean(flattened_data, dim=0)[None, None, :]
 
-    def normalize(self, data: t.Tensor, device=None):
-        max_val = self.ranges[:, 0][None, :, None, None]
-        min_val = self.ranges[:, -1][None, :, None, None]
-        normalized = 0.1 + 0.9 * (data - min_val) / (max_val - min_val)
-        return normalized
+    def normalize(self, data: t.Tensor) -> t.Tensor:
+        result = data
+        if self.norm_type == 'minmax':
+            result = (data - self.min) / (self.max - self.min)
+        elif type == 'meanvar':
+            result = (data - self.mean) / self.var
+        return result
 
-    def denormalize(self, data: t.Tensor, device=None):
-        device = device or t.device("cpu")
-        max_val = self.ranges[:, 0][None, :, None, None].to(device)
-        min_val = self.ranges[:, -1][None, :, None, None].to(device)
-        return ((data - 0.1) * (max_val - min_val)) / 0.9 - max_val
+    def denormalize(self, data: t.Tensor) -> t.Tensor:
+        result = data
+        if self.norm_type == 'minmax':
+            result = data * (self.max - self.min) + self.min
+        elif type == 'meanvar':
+            result = data * self.var + self.mean
+        return result
 
-    def discretize(self, data, device=None):
-        device = device or t.device("cpu")
-        threshold = self.ranges[:, 1][None, :, None, None].to(device)
-        return data > threshold
+    def discretize(self, data: t.Tensor) -> t.Tensor:
+        return data > self.mean
