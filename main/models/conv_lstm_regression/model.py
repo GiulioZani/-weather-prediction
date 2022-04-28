@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 import torch.nn.functional as F
 import torch as t
 
-from main.models.conv_lstm_regression.modules import EncoderDecoderConvLSTM
+from .modules import EncoderDecoderConvLSTM
 
 
 class Model(BaseModel):
@@ -11,5 +11,13 @@ class Model(BaseModel):
         super().__init__(params)
         self.generator = EncoderDecoderConvLSTM(params)
 
-    def configure_optimizers(self):
-        return t.optim.Adam(self.parameters(), lr=self.params.lr)
+    def test_step(self, batch, batch_idx:int):
+        x, y = batch
+        out, hidden = self.generator(x)
+        acc = []
+        for i in range(len(y.shape[1])):
+            out, hidden = self.generator(out, hidden)
+            acc.append(out)
+        y_hat = t.stack(acc, dim=1)
+        return self.test_without_forward(y, y_hat)
+
