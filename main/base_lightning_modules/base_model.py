@@ -34,27 +34,24 @@ class BaseModel(LightningModule):
         self.log("val_mse", loss, prog_bar=True)
         return {"val_mse": loss}
 
-    def test_step(self, batch: tuple[t.Tensor, t.Tensor], batch_idx: int):
-        x, y = batch
-        
-        if batch_idx == 0:
-            visualize_predictions(x, y, self(x), path=self.params.save_path)
-
-        pred_y = self(x)
-        y_single = y[:, :, -1, 2]
-        pred_y_single = pred_y[:, :, -1, 2]
+    def test_without_forward(self, y, pred_y):
+        y_single = y#[:, :, -1, 2]
+        pred_y_single = pred_y#[:, :, -1, 2]
         se = F.mse_loss(pred_y_single, y_single, reduction="sum")
         denorm_pred_y = self.params.data_manager.denormalize(pred_y)  # , self.device)
         denorm_y = self.params.data_manager.denormalize(y)  # , self.device)
-        ae = F.l1_loss(denorm_pred_y[:, :, -1, 2], denorm_y[:, :, -1, 2], reduction="sum")
+        ae = F.l1_loss(
+            denorm_pred_y, #[:, :, -1, 2],
+            denorm_y, #[:, :, -1, 2],
+        reduction="sum")
         mask_pred_y = self.params.data_manager.discretize(
             denorm_pred_y
         )  # , self.device)
-        mask_y = self.params.data_manager.discretize(denorm_y)  # , self.device)
+        mask_y = self.params.data_manager.discretize(denorm_y) # [:, :, -1, 2]
         tn, fp, fn, tp = t.bincount(
-            mask_y[:, :, -1, 2].flatten() * 2 + mask_pred_y[:, :, -1, 2].flatten(), minlength=4,
+            mask_y.flatten() * 2 + mask_pred_y.flatten(), minlength=4,
         )
-        total_lengh = mask_y[:, :, -1, 2].numel()
+        total_lengh = mask_y.numel()
         return {
             "se": se,
             "ae": ae,
@@ -64,6 +61,15 @@ class BaseModel(LightningModule):
             "tp": tp,
             "total_lengh": total_lengh,
         }
+
+    def test_step(self, batch: tuple[t.Tensor, t.Tensor], batch_idx: int):
+        x, y = batch
+        
+        if batch_idx == 0:
+            visualize_predictions(x, y, self(x), path=self.params.save_path)
+
+        pred_y = self(x)
+        return self.test_without_forward(y, pred_y)
 
     def configure_optimizers(self):
         return t.optim.Adam(self.parameters(), lr=self.params.lr)
