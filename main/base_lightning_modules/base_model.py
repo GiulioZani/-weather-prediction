@@ -16,7 +16,11 @@ class BaseModel(LightningModule):
         self.loss = t.nn.MSELoss()
 
     def forward(self, z: t.Tensor) -> t.Tensor:
-        return self.generator(z)
+        out = self.generator(z)
+        # if out is tuple, return the first element
+        if isinstance(out, tuple):
+            return out[0]
+        return out
 
     def training_step(self, batch: tuple[t.Tensor, t.Tensor], batch_idx: int):
         x, y = batch
@@ -28,7 +32,6 @@ class BaseModel(LightningModule):
         x, y = batch
         if batch_idx == 0:
             visualize_predictions(x, y, self(x), path=self.params.save_path)
-
         pred_y = self(x)
         loss = F.mse_loss(pred_y, y)
         self.log("val_mse", loss, prog_bar=True)
