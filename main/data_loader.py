@@ -42,7 +42,7 @@ class CustomDataModule(LightningDataModule):
             self.test_set, in_seq_len=self.in_seq_len, out_seq_len=self.out_seq_len,
         )
         return DataLoader(
-            dataset, batch_size=self.train_batch_size, drop_last=True, num_workers=3,
+            dataset, batch_size=self.test_batch_size, drop_last=True, num_workers=3,
         )
 
     def test_dataloader(self):
@@ -51,7 +51,7 @@ class CustomDataModule(LightningDataModule):
             self.test_set, in_seq_len=self.in_seq_len, out_seq_len=self.out_seq_len,
         )
         return DataLoader(
-            dataset, batch_size=self.train_batch_size, drop_last=True, num_workers=3,
+            dataset, batch_size=self.test_batch_size, drop_last=True, num_workers=3,
         )
 
 
