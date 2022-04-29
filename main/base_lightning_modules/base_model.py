@@ -28,7 +28,9 @@ class BaseModel(LightningModule):
         loss = self.loss(y_pred, y)
         return loss
 
-    def validation_step(self, batch: tuple[t.Tensor, t.Tensor], batch_idx: int):
+    def validation_step(
+        self, batch: tuple[t.Tensor, t.Tensor], batch_idx: int
+    ):
         x, y = batch
         if batch_idx == 0:
             visualize_predictions(x, y, self(x), path=self.params.save_path)
@@ -41,10 +43,19 @@ class BaseModel(LightningModule):
         y_single = y  # [:, :, -1, 2]
         pred_y_single = pred_y  # [:, :, -1, 2]
         se = F.mse_loss(pred_y_single, y_single, reduction="sum")
-        denorm_pred_y = self.params.data_manager.denormalize(pred_y)  # , self.device)
+        denorm_pred_y = self.params.data_manager.denormalize(
+            pred_y
+        )  # , self.device)
         denorm_y = self.params.data_manager.denormalize(y)  # , self.device)
         ae = F.l1_loss(
-            denorm_pred_y, denorm_y, reduction="sum"  # [:, :, -1, 2],  # [:, :, -1, 2],
+            denorm_pred_y,
+            denorm_y,
+            reduction="sum",  # [:, :, -1, 2],  # [:, :, -1, 2],
+        )
+        temp_ae = F.l1_loss(
+            denorm_pred_y[:, :, -1, 2],
+            denorm_y[:, :, -1, 2],
+            reduction="sum",  # [:, :, -1, 2],  # [:, :, -1, 2],
         )
         mask_pred_y = self.params.data_manager.discretize(
             denorm_pred_y
@@ -61,6 +72,7 @@ class BaseModel(LightningModule):
             "fp": fp,
             "fn": fn,
             "tp": tp,
+            "temp_ae": temp_ae,
             "total_lengh": total_lengh,
         }
 
@@ -83,12 +95,19 @@ class BaseModel(LightningModule):
             min_lr=1e-6,
             verbose=True,
         )
-        return {'optimizer':optimizer, 'lr_scheduler': scheduler, 'monitor': 'val_mse'}
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": scheduler,
+            "monitor": "val_mse",
+        }
 
     def test_epoch_end(self, outputs):
         total_lenght = sum([x["total_lengh"] for x in outputs])
         mse = t.stack([x["se"] for x in outputs]).sum() / total_lenght
         mae = t.stack([x["ae"] for x in outputs]).sum() / total_lenght
+        mae_temp = (
+            t.stack([x["temp_ae"] for x in outputs]).sum() / total_lenght
+        )
         tn = t.stack([x["tn"] for x in outputs]).sum() / total_lenght
         fp = t.stack([x["fp"] for x in outputs]).sum() / total_lenght
         fn = t.stack([x["fn"] for x in outputs]).sum() / total_lenght
@@ -104,6 +123,7 @@ class BaseModel(LightningModule):
             "recall": recall,
             "accuracy": accuracy,
             "f1": f1,
+            "mae_temp": mae_temp,
         }
         test_metrics = {k: v for k, v in test_metrics.items()}
         self.log("test_performance", test_metrics, prog_bar=True)
