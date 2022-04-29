@@ -38,19 +38,18 @@ class BaseModel(LightningModule):
         return {"val_mse": loss}
 
     def test_without_forward(self, y, pred_y):
-        y_single = y#[:, :, -1, 2]
-        pred_y_single = pred_y#[:, :, -1, 2]
+        y_single = y  # [:, :, -1, 2]
+        pred_y_single = pred_y  # [:, :, -1, 2]
         se = F.mse_loss(pred_y_single, y_single, reduction="sum")
         denorm_pred_y = self.params.data_manager.denormalize(pred_y)  # , self.device)
         denorm_y = self.params.data_manager.denormalize(y)  # , self.device)
         ae = F.l1_loss(
-            denorm_pred_y, #[:, :, -1, 2],
-            denorm_y, #[:, :, -1, 2],
-        reduction="sum")
+            denorm_pred_y, denorm_y, reduction="sum"  # [:, :, -1, 2],  # [:, :, -1, 2],
+        )
         mask_pred_y = self.params.data_manager.discretize(
             denorm_pred_y
         )  # , self.device)
-        mask_y = self.params.data_manager.discretize(denorm_y) # [:, :, -1, 2]
+        mask_y = self.params.data_manager.discretize(denorm_y)  # [:, :, -1, 2]
         tn, fp, fn, tp = t.bincount(
             mask_y.flatten() * 2 + mask_pred_y.flatten(), minlength=4,
         )
@@ -67,7 +66,7 @@ class BaseModel(LightningModule):
 
     def test_step(self, batch: tuple[t.Tensor, t.Tensor], batch_idx: int):
         x, y = batch
-        
+
         if batch_idx == 0:
             visualize_predictions(x, y, self(x), path=self.params.save_path)
 
@@ -75,7 +74,16 @@ class BaseModel(LightningModule):
         return self.test_without_forward(y, pred_y)
 
     def configure_optimizers(self):
-        return t.optim.Adam(self.parameters(), lr=self.params.lr)
+        optimizer = t.optim.Adam(self.parameters(), lr=self.params.lr)
+        scheduler = t.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode="min",
+            factor=0.2,
+            patience=self.params.reduce_lr_on_plateau_patience,
+            min_lr=1e-6,
+            verbose=True,
+        )
+        return {'optimizer':optimizer, 'lr_scheduler': scheduler, 'monitor': 'val_mse'}
 
     def test_epoch_end(self, outputs):
         total_lenght = sum([x["total_lengh"] for x in outputs])
