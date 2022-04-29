@@ -8,6 +8,7 @@ from main.models.conv.model import GaussianNoise
 from main.torch_model_modules.ConvLSTM import ConvLSTMCell
 from main.torch_model_modules.ConvLSTMModule import ConvLSTMBlock
 
+
 class EncoderDecoderConvLSTM(nn.Module):
     def __init__(self, params, nf=8):
         super(EncoderDecoderConvLSTM, self).__init__()
@@ -16,6 +17,8 @@ class EncoderDecoderConvLSTM(nn.Module):
         in_chan = 1
 
         self.conv_lstm_out_chan = 32
+
+        self.z_dim = 16
         """ ARCHITECTURE 
 
         # Encoder (ConvLSTM)
@@ -28,51 +31,66 @@ class EncoderDecoderConvLSTM(nn.Module):
 
         self.conv_encoders = [
             ConvLSTMBlock(
-            in_chan, 4, kernel_size=(3, 3), bias=True, dropout=False,
+                in_chan,
+                8,
+                kernel_size=(3, 3),
+                bias=True,
+                dropout=False,
+                batch_norm=False,
             ),
             ConvLSTMBlock(
-            4, 16, kernel_size=(3, 3), bias=True, dropout=0.1
+                8,
+                16,
+                kernel_size=(3, 3),
+                bias=True,
+                dropout=False,
+                batch_norm=False,
             ),
             # ConvLSTMBlock(
-            # 8, 16, kernel_size=(3, 3), bias=True, dropout=0.1
+            # 16, 16, kernel_size=(3, 3), bias=True, dropout=False
             # ),
-
         ]
 
         self.conv_decoders = [
             ConvLSTMBlock(
-                16, 16, kernel_size=(3, 3), bias=True, dropout=0.1),
+                16,
+                32,
+                kernel_size=(3, 3),
+                bias=True,
+                dropout=False,
+                batch_norm=False,
+            ),
             ConvLSTMBlock(
-                16, 16, kernel_size=(3, 3), bias=True, dropout=False),
+                32,
+                16,
+                kernel_size=(3, 3),
+                bias=True,
+                dropout=False,
+                batch_norm=False,
+            ),
         ]
 
-     
-        self.conv_lstms =  self.conv_encoders + self.conv_decoders
-        
+        self.conv_lstms = self.conv_encoders + self.conv_decoders
+
         for i in range(len(self.conv_lstms)):
-            setattr(self, 'conv_lstm_' + str(i), self.conv_lstms[i])
-        
+            setattr(self, "conv_lstm_" + str(i), self.conv_lstms[i])
+
         self.decoder_CNN = nn.Sequential(
             nn.Conv3d(
-                in_channels=16,
+                in_channels=self.z_dim,
                 out_channels=1,
                 kernel_size=(1, 3, 3),
                 padding=(0, 1, 1),
             )
         )
 
-        self.gaussian_noise = GaussianNoise(0.0001)
+        self.noise = 0.0001
 
+        self.gaussian_noise = GaussianNoise(self.noise)
 
-
-   
-
-    def autoencoder(
-        self, x, seq_len, future_step, h
-    ):
+    def autoencoder(self, x, seq_len, future_step, h):
 
         outputs = []
-
 
         # encoder
         for t in range(seq_len):
@@ -80,12 +98,13 @@ class EncoderDecoderConvLSTM(nn.Module):
             input_tensor = x[:, t, :, :, :]
             # looping over encoders
             for i in range(len(self.conv_encoders)):
-                input_tensor, c = self.conv_encoders[i](input_tensor=input_tensor, cur_state=h[i])
+                input_tensor, c = self.conv_encoders[i](
+                    input_tensor=input_tensor, cur_state=h[i]
+                )
                 h[i] = (input_tensor, c)
 
         # encoder_vector
         encoder_vector = h[len(self.conv_encoders) - 1][0]
-
 
         # decoder
         for t in range(future_step):
@@ -94,10 +113,11 @@ class EncoderDecoderConvLSTM(nn.Module):
             # looping over decoders
             # ipdb.set_trace()
             for i in range(len(self.conv_decoders)):
-                input_tensor, c = self.conv_decoders[i](input_tensor=input_tensor, cur_state=h[i+len(self.conv_encoders)])
-                h[i+len(self.conv_encoders)] = (input_tensor, c)
+                input_tensor, c = self.conv_decoders[i](
+                    input_tensor=input_tensor, cur_state=h[i + len(self.conv_encoders)]
+                )
+                h[i + len(self.conv_encoders)] = (input_tensor, c)
 
- 
             encoder_vector = h[-1][0]
             outputs += [h[-1][0]]  # predictions
 
@@ -109,10 +129,9 @@ class EncoderDecoderConvLSTM(nn.Module):
         outputs = self.decoder_CNN(outputs)
         outputs = torch.nn.Sigmoid()(outputs)
 
-
         return outputs, h
 
-    def forward(self, x, hidden = None, future_step = None):
+    def forward(self, x, hidden=None, future_step=None):
 
         # ipdb.set_trace()
 
@@ -132,6 +151,8 @@ class EncoderDecoderConvLSTM(nn.Module):
 
         # find size of different input dimensions
 
+        # noise vector adding to channels
+
         x = self.gaussian_noise(x)
 
         b, seq_len, _, h, w = x.size()
@@ -144,13 +165,9 @@ class EncoderDecoderConvLSTM(nn.Module):
             for i in range(len(self.conv_lstms)):
                 state = self.conv_lstms[i].init_hidden(x)
                 hidden += [state]
-        
-
 
         # autoencoder forward
-        outputs, h = self.autoencoder(
-            x, seq_len, future_step, hidden
-        )
+        outputs, h = self.autoencoder(x, seq_len, future_step, hidden)
 
         # ipdb.set_trace()
 
@@ -159,5 +176,3 @@ class EncoderDecoderConvLSTM(nn.Module):
 
         # ipdb.set_trace()
         return outputs, h
-
-
