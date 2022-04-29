@@ -25,42 +25,36 @@ class EncoderDecoderConvLSTM(nn.Module):
 
 
         """
-        self.encoder_1_convlstm = ConvLSTMBlock(
+
+        self.conv_encoders = [
+            ConvLSTMBlock(
             in_chan, 4, kernel_size=(3, 3), bias=True, dropout=False,
-        )
-        self.encoder_2_convlstm = ConvLSTMBlock(
-            4, 8, kernel_size=(3, 3), bias=True, dropout=0.1
-        )
-        self.encoder_3_convlstm = ConvLSTMBlock(
-            8, 16, kernel_size=(3, 3), bias=True, dropout=0.1
-        )
-        self.encoder_4_convlstm = ConvLSTMBlock(
-            16, 32, kernel_size=(3, 3), bias=True, dropout=False
-        )
+            ),
+            ConvLSTMBlock(
+            4, 16, kernel_size=(3, 3), bias=True, dropout=0.1
+            ),
+            # ConvLSTMBlock(
+            # 8, 16, kernel_size=(3, 3), bias=True, dropout=0.1
+            # ),
 
+        ]
 
-        self.decoder_1_convlstm = ConvLSTMBlock(
-            32, 32, kernel_size=(3, 3), bias=True, dropout=False
-        )
-        self.decoder_2_convlstm = ConvLSTMBlock(
-            32, 32, kernel_size=(3, 3), bias=True, dropout=False
-        )
-        # self.decoder_3_convlstm = ConvLSTMBlock(
-        #     32, 16, kernel_size=(3, 3), bias=True
-        # )
-        # self.decoder_4_convlstm = ConvLSTMBlock(
-        #     16, 1, kernel_size=(3, 3), bias=True
-        # )
+        self.conv_decoders = [
+            ConvLSTMBlock(
+                16, 16, kernel_size=(3, 3), bias=True, dropout=0.1),
+            ConvLSTMBlock(
+                16, 16, kernel_size=(3, 3), bias=True, dropout=False),
+        ]
 
-        self.conv_lstms = [ self.encoder_1_convlstm, self.encoder_2_convlstm, self.encoder_3_convlstm, self.encoder_4_convlstm,
-         self.decoder_1_convlstm, self.decoder_2_convlstm]# , self.decoder_3_convlstm, self.decoder_4_convlstm ]
-
-        self.conv_encoders = [self.encoder_1_convlstm, self.encoder_2_convlstm, self.encoder_3_convlstm, self.encoder_4_convlstm]
-        self.conv_decoders = [self.decoder_1_convlstm, self.decoder_2_convlstm]#, self.decoder_3_convlstm, self.decoder_4_convlstm]
-
+     
+        self.conv_lstms =  self.conv_encoders + self.conv_decoders
+        
+        for i in range(len(self.conv_lstms)):
+            setattr(self, 'conv_lstm_' + str(i), self.conv_lstms[i])
+        
         self.decoder_CNN = nn.Sequential(
             nn.Conv3d(
-                in_channels=32,
+                in_channels=16,
                 out_channels=1,
                 kernel_size=(1, 3, 3),
                 padding=(0, 1, 1),
