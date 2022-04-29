@@ -3,7 +3,9 @@ import torch as t
 import torch.nn.functional as F
 from argparse import Namespace
 from ..utils.visualize_predictions import visualize_predictions
+import matplotlib.pyplot as plt
 import ipdb
+import os
 
 
 class BaseModel(LightningModule):
@@ -27,6 +29,8 @@ class BaseModel(LightningModule):
         y_pred = self(x)
         loss = self.loss(y_pred, y)
         return loss
+
+    # def validation_epoch_end
 
     def validation_step(
         self, batch: tuple[t.Tensor, t.Tensor], batch_idx: int
@@ -90,7 +94,7 @@ class BaseModel(LightningModule):
         scheduler = t.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
             mode="min",
-            factor=0.2,
+            factor=0.1,
             patience=self.params.reduce_lr_on_plateau_patience,
             min_lr=1e-6,
             verbose=True,
@@ -101,7 +105,46 @@ class BaseModel(LightningModule):
             "monitor": "val_mse",
         }
 
+    def plot_test(self):
+        test_dl = self.trainer.test_dataloaders[0]
+        for batch in test_dl:
+            x, y = batch
+            pred_y = self(x.to(self.device))
+            pred_y_city = pred_y[0, :, -1, 2].cpu()
+            y_city = y[0, :, -1, 2]
+            xs = t.arange(len(pred_y_city))
+            plt.plot(xs, pred_y_city, label="prediction")
+            plt.plot(xs, y_city, label="ground truth")
+            plt.legend()
+            plt.savefig(
+                os.path.join(self.params.save_path, "final_prediction.png")
+            )
+            plt.close()
+
+    def plot_importance_scores(self):
+        if hasattr(self.generator, "get_importance_scores"):
+            importance_scores = self.generator.get_importance_scores()
+            plt.title("Variable Importance Scores")
+            plt.imshow(
+                importance_scores[0], cmap="hot", interpolation="nearest"
+            )
+            plt.savefig(
+                os.path.join(
+                    self.params.save_path, "variables_importance_scores.png"
+                )
+            )
+            plt.title("City Importance Scores")
+            plt.imshow(
+                importance_scores[1], cmap="hot", interpolation="nearest"
+            )
+            plt.savefig(
+                os.path.join(
+                    self.params.save_path, "city_importance_scores.png"
+                )
+            )
+
     def test_epoch_end(self, outputs):
+        self.plot_test()
         total_lenght = sum([x["total_lengh"] for x in outputs])
         mse = t.stack([x["se"] for x in outputs]).sum() / total_lenght
         mae = t.stack([x["ae"] for x in outputs]).sum() / total_lenght
