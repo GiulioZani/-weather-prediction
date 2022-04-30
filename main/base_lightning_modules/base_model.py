@@ -117,9 +117,14 @@ class BaseModel(LightningModule):
             plt.plot(xs, y_city, label="ground truth")
             plt.legend()
             plt.savefig(
-                os.path.join(self.params.save_path, "final_prediction.png")
+                os.path.join(self.params.save_path, "168_final_prediction.png")
             )
-            plt.close()
+            plt.plot(xs[:10], pred_y_city[:10], label="prediction")
+            plt.plot(xs[:10], y_city[:10], label="ground truth")
+            plt.legend()
+            plt.savefig(
+                os.path.join(self.params.save_path, "10_final_prediction.png")
+            )
 
     def plot_importance_scores(self):
         if hasattr(self.generator, "get_importance_scores"):
