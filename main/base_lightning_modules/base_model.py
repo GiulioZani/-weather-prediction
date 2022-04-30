@@ -38,7 +38,7 @@ class BaseModel(LightningModule):
         x, y = batch
         if batch_idx == 0:
             visualize_predictions(x, y, self(x), path=self.params.save_path)
-        pred_y = self(x)
+        pred_y = self.generator(x, future_step=y.shape[1])[0]
         loss = F.mse_loss(pred_y, y)
         self.log("val_mse", loss, prog_bar=True)
         return {"val_mse": loss}
@@ -109,7 +109,9 @@ class BaseModel(LightningModule):
         test_dl = self.trainer.test_dataloaders[0]
         for batch in test_dl:
             x, y = batch
-            pred_y = self.generator(x.to(self.device), future_step=y.shape[1])[0]
+            pred_y = self.generator(x.to(self.device), future_step=y.shape[1])[
+                0
+            ]
             pred_y_city = pred_y[0, :, -1, 2].cpu()
             y_city = y[0, :, -1, 2]
             xs = t.arange(len(pred_y_city))
@@ -120,8 +122,16 @@ class BaseModel(LightningModule):
                 os.path.join(self.params.save_path, "168_final_prediction.png")
             )
             plt.clf()
-            plt.plot(xs[:self.params.test_seq_len], pred_y_city[:self.params.test_seq_len], label="prediction")
-            plt.plot(xs[:self.params.test_seq_len], y_city[:self.params.test_seq_len], label="ground truth")
+            plt.plot(
+                xs[: self.params.test_seq_len],
+                pred_y_city[: self.params.test_seq_len],
+                label="prediction",
+            )
+            plt.plot(
+                xs[: self.params.test_seq_len],
+                y_city[: self.params.test_seq_len],
+                label="ground truth",
+            )
             plt.legend()
             plt.savefig(
                 os.path.join(self.params.save_path, "10_final_prediction.png")
