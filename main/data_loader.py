@@ -13,45 +13,59 @@ import scipy.io
 class CustomDataModule(LightningDataModule):
     def __init__(self, params):
         super().__init__()
-        raw_dataset = t.from_numpy(scipy.io.loadmat(params.data_location)["X"]).float()
+        raw_dataset = t.from_numpy(
+            scipy.io.loadmat(params.data_location)["X"]
+        ).float()
         self.params = params
         self.params.data_manager = DataManager(data=raw_dataset)
         dataset = self.params.data_manager.normalize(raw_dataset)
         self.in_seq_len = params.in_seq_len
         self.out_seq_len = params.out_seq_len
-        tot_length = self.in_seq_len + self.out_seq_len
+        self.test_seq_len = params.test_seq_len
+        tot_length = self.in_seq_len + self.test_seq_len
         self.test_set = dataset[-tot_length:]
         self.train_set = dataset[:-tot_length]
         self.train_batch_size = params.train_batch_size
         self.test_batch_size = params.test_batch_size
-        
+
     def train_dataloader(self):
         # creates a DeepCoastalDataset object
         dataset = CustomDataset(
-            self.train_set,
-            in_seq_len=self.in_seq_len,
-            lag=1,
+            self.train_set, in_seq_len=self.in_seq_len, lag=1,
         )
         return DataLoader(
-            dataset, batch_size=self.train_batch_size, drop_last=True, num_workers=3,
+            dataset,
+            batch_size=self.train_batch_size,
+            drop_last=True,
+            num_workers=3,
         )
 
     def val_dataloader(self):
         # creates a DeepCoastalDataset object
         dataset = CustomDataset(
-            self.test_set, in_seq_len=self.in_seq_len, out_seq_len=self.out_seq_len,
+            self.test_set,
+            in_seq_len=self.in_seq_len,
+            out_seq_len=self.test_seq_len,
         )
         return DataLoader(
-            dataset, batch_size=self.test_batch_size, drop_last=True, num_workers=3,
+            dataset,
+            batch_size=self.test_batch_size,
+            drop_last=True,
+            num_workers=3,
         )
 
     def test_dataloader(self):
         # creates a DeepCoastalDataset object
         dataset = CustomDataset(
-            self.test_set, in_seq_len=self.in_seq_len, out_seq_len=self.out_seq_len,
+            self.test_set,
+            in_seq_len=self.in_seq_len,
+            out_seq_len=self.test_seq_len,
         )
         return DataLoader(
-            dataset, batch_size=self.test_batch_size, drop_last=True, num_workers=3,
+            dataset,
+            batch_size=self.test_batch_size,
+            drop_last=True,
+            num_workers=3,
         )
 
 
@@ -62,31 +76,57 @@ class CustomDataset(Dataset):
         *,
         in_seq_len: int = 10,
         out_seq_len: int = -1,
-        lag:int = -1,
+        lag: int = -1,
         augment: bool = False,
     ):
         self.in_seq_len = in_seq_len
         self.out_seq_len = out_seq_len
         self.lag = lag
-        assert not (out_seq_len == -1 and lag == -1), "out_seq_len or lag must be specified."
-        assert not (lag != -1 and augment), "augment cannot be used with lag."  
-        tot_lenght = (self.in_seq_len + self.out_seq_len) if lag == -1 else (self.in_seq_len + lag)
+        assert not (
+            out_seq_len == -1 and lag == -1
+        ), "out_seq_len or lag must be specified."
+        assert not (lag != -1 and augment), "augment cannot be used with lag."
+        tot_lenght = (
+            (self.in_seq_len + self.out_seq_len)
+            if lag == -1
+            else (self.in_seq_len + lag)
+        )
         data = data[: (len(data) // tot_lenght) * tot_lenght]
         segments = (
-            t.stack(
-                tuple(data[i : i + tot_lenght] for i in range(len(data) - tot_lenght))
+            (
+                t.stack(
+                    tuple(
+                        data[i : i + tot_lenght]
+                        for i in range(len(data) - tot_lenght)
+                    )
+                )
+                if augment
+                else data.reshape(-1, tot_lenght, data.shape[1], data.shape[2])
             )
-            if augment
-            else data.reshape(-1, tot_lenght, data.shape[1], data.shape[2])
-        ) if lag == -1 else t.stack(tuple(data[i : i + tot_lenght] for i in range(len(data) - tot_lenght)))
+            if lag == -1
+            else t.stack(
+                tuple(
+                    data[i : i + tot_lenght]
+                    for i in range(len(data) - tot_lenght)
+                )
+            )
+        )
         self.data = segments
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        x = self.data[idx, : self.in_seq_len] if self.lag == -1 else self.data[idx, :-1]
-        y = self.data[idx, -self.out_seq_len :] if self.lag == -1 else self.data[idx, 1:]
+        x = (
+            self.data[idx, : self.in_seq_len]
+            if self.lag == -1
+            else self.data[idx, :-1]
+        )
+        y = (
+            self.data[idx, -self.out_seq_len :]
+            if self.lag == -1
+            else self.data[idx, 1:]
+        )
         return x, y
 
 

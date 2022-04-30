@@ -5,7 +5,9 @@ import torch as t
 import torch.nn.functional as f
 
 from main.models.conv.model import GaussianNoise
-from main.torch_model_modules.AxialConvLSMTModule import ConvLSTMBlock
+from main.torch_model_modules.ConvLSTM import ConvLSTMCell
+from main.torch_model_modules.ConvLSTMModule import ConvLSTMBlock
+
 
 
 class EncoderDecoderConvLSTM(nn.Module):
@@ -113,8 +115,7 @@ class EncoderDecoderConvLSTM(nn.Module):
             # ipdb.set_trace()
             for i in range(len(self.conv_decoders)):
                 input_tensor, c = self.conv_decoders[i](
-                    input_tensor=input_tensor,
-                    cur_state=h[i + len(self.conv_encoders)],
+                    input_tensor=input_tensor, cur_state=h[i + len(self.conv_encoders)]
                 )
                 h[i + len(self.conv_encoders)] = (input_tensor, c)
 

@@ -5,7 +5,50 @@ import torch as t
 import torch.nn.functional as f
 
 from main.models.conv.model import GaussianNoise
-from main.torch_model_modules.AxialConvLSMTModule import ConvLSTMBlock
+from .AxialConvLSMT import ConvLSTMCell
+
+
+class ConvLSTMBlock(nn.Module):
+    def __init__(
+        self,
+        in_channel,
+        out_channel,
+        kernel_size=(3, 3),
+        bias=True,
+        batch_norm=True,
+        dropout=0.2,
+        act=nn.LeakyReLU(0.2, inplace=True),
+    ) -> None:
+        super().__init__()
+
+        self.conv_cell = ConvLSTMCell(
+            in_channel, out_channel, kernel_size, bias
+        )
+        self.norm = nn.BatchNorm2d(out_channel)
+        self.dout = nn.Dropout3d(p=dropout)
+
+        self.act = act
+        self.batch_norm = batch_norm
+        self.dropout = dropout
+
+    def init_hidden(self, x):
+        b, _, _, h, w = x.size()
+        h_t, c_t = self.conv_cell.init_hidden(batch_size=b, image_size=(h, w))
+        return h_t, c_t
+
+    def forward(self, input_tensor, cur_state):
+
+        # h_t, c_t = cur_state
+        # ipdb.set_trace()
+
+        h_t, c_t = self.conv_cell(input_tensor, cur_state)
+        x = h_t
+        if self.batch_norm:
+            x = self.norm(h_t)
+        if self.dropout:
+            x = self.dout(x)
+        x = self.act(x)
+        return x, c_t
 
 
 class EncoderDecoderConvLSTM(nn.Module):
@@ -16,8 +59,6 @@ class EncoderDecoderConvLSTM(nn.Module):
         in_chan = 1
 
         self.conv_lstm_out_chan = 32
-
-        self.z_dim = 16
         """ ARCHITECTURE 
 
         # Encoder (ConvLSTM)
@@ -27,65 +68,60 @@ class EncoderDecoderConvLSTM(nn.Module):
 
 
         """
+        self.encoder_1_convlstm = ConvLSTMBlock(
+            in_chan, 8, kernel_size=(3, 3), bias=True
+        )
+        self.encoder_2_convlstm = ConvLSTMBlock(
+            8, 16, kernel_size=(3, 3), bias=True
+        )
+        self.encoder_3_convlstm = ConvLSTMBlock(
+            16, 32, kernel_size=(3, 3), bias=True
+        )
+        self.encoder_4_convlstm = ConvLSTMBlock(
+            32, 64, kernel_size=(3, 3), bias=True
+        )
+
+        self.decoder_1_convlstm = ConvLSTMBlock(
+            64, 64, kernel_size=(3, 3), bias=True
+        )
+        # self.decoder_2_convlstm = ConvLSTMBlock(
+        #     64, 32, kernel_size=(3, 3), bias=True
+        # )
+        # self.decoder_3_convlstm = ConvLSTMBlock(
+        #     32, 16, kernel_size=(3, 3), bias=True
+        # )
+        # self.decoder_4_convlstm = ConvLSTMBlock(
+        #     16, 1, kernel_size=(3, 3), bias=True
+        # )
+
+        self.conv_lstms = [
+            self.encoder_1_convlstm,
+            self.encoder_2_convlstm,
+            self.encoder_3_convlstm,
+            self.encoder_4_convlstm,
+            self.decoder_1_convlstm,
+        ]  # self.decoder_2_convlstm, self.decoder_3_convlstm, self.decoder_4_convlstm ]
 
         self.conv_encoders = [
-            ConvLSTMBlock(
-                in_chan,
-                8,
-                kernel_size=(3, 3),
-                bias=True,
-                dropout=False,
-                batch_norm=False,
-            ),
-            ConvLSTMBlock(
-                8,
-                16,
-                kernel_size=(3, 3),
-                bias=True,
-                dropout=False,
-                batch_norm=False,
-            ),
-            # ConvLSTMBlock(
-            # 16, 16, kernel_size=(3, 3), bias=True, dropout=False
-            # ),
+            self.encoder_1_convlstm,
+            self.encoder_2_convlstm,
+            self.encoder_3_convlstm,
+            self.encoder_4_convlstm,
         ]
-
         self.conv_decoders = [
-            ConvLSTMBlock(
-                16,
-                32,
-                kernel_size=(3, 3),
-                bias=True,
-                dropout=False,
-                batch_norm=False,
-            ),
-            ConvLSTMBlock(
-                32,
-                16,
-                kernel_size=(3, 3),
-                bias=True,
-                dropout=False,
-                batch_norm=False,
-            ),
-        ]
-
-        self.conv_lstms = self.conv_encoders + self.conv_decoders
-
-        for i in range(len(self.conv_lstms)):
-            setattr(self, "conv_lstm_" + str(i), self.conv_lstms[i])
+            self.decoder_1_convlstm,
+        ]  # self.decoder_2_convlstm, self.decoder_3_convlstm, self.decoder_4_convlstm]
 
         self.decoder_CNN = nn.Sequential(
             nn.Conv3d(
-                in_channels=self.z_dim,
+                in_channels=64,
                 out_channels=1,
                 kernel_size=(1, 3, 3),
                 padding=(0, 1, 1),
             )
         )
 
-        self.noise = 0.0001
-
-        self.gaussian_noise = GaussianNoise(self.noise)
+        self.gaussian_noise = GaussianNoise(0.00001)
 
     def autoencoder(self, x, seq_len, future_step, h):
 
@@ -101,6 +137,16 @@ class EncoderDecoderConvLSTM(nn.Module):
                     input_tensor=input_tensor, cur_state=h[i]
                 )
                 h[i] = (input_tensor, c)
+
+            # h_t, c_t = self.encoder_1_convlstm(
+            #     input_tensor=x[:, t, :, :], cur_state=[h_t, c_t]
+            # )  # we could concat to provide skip conn here
+            # h_t2, c_t2 = self.encoder_2_convlstm(
+            #     input_tensor=h_t, cur_state=[h_t2, c_t2]
+            # )  # we could concat to provide skip conn here
+
+            # encoder_vector = h_t4
+            # outputs += [h_t4]  # predictions
 
         # encoder_vector
         encoder_vector = h[len(self.conv_encoders) - 1][0]
@@ -118,7 +164,7 @@ class EncoderDecoderConvLSTM(nn.Module):
                 )
                 h[i + len(self.conv_encoders)] = (input_tensor, c)
 
-            encoder_vector = h[-1][0]
+            encoder_vector = h[len(self.conv_encoders)][0]
             outputs += [h[-1][0]]  # predictions
 
         # ipdb.set_trace()
@@ -150,8 +196,6 @@ class EncoderDecoderConvLSTM(nn.Module):
         # ipdb.set_trace()
 
         # find size of different input dimensions
-
-        # noise vector adding to channels
 
         x = self.gaussian_noise(x)
 

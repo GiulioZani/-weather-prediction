@@ -109,7 +109,7 @@ class BaseModel(LightningModule):
         test_dl = self.trainer.test_dataloaders[0]
         for batch in test_dl:
             x, y = batch
-            pred_y = self(x.to(self.device))
+            pred_y = self.generator(x.to(self.device), future_step=y.shape[1])[0]
             pred_y_city = pred_y[0, :, -1, 2].cpu()
             y_city = y[0, :, -1, 2]
             xs = t.arange(len(pred_y_city))
@@ -119,8 +119,9 @@ class BaseModel(LightningModule):
             plt.savefig(
                 os.path.join(self.params.save_path, "168_final_prediction.png")
             )
-            plt.plot(xs[:10], pred_y_city[:10], label="prediction")
-            plt.plot(xs[:10], y_city[:10], label="ground truth")
+            plt.clf()
+            plt.plot(xs[:self.params.test_seq_len], pred_y_city[:self.params.test_seq_len], label="prediction")
+            plt.plot(xs[:self.params.test_seq_len], y_city[:self.params.test_seq_len], label="ground truth")
             plt.legend()
             plt.savefig(
                 os.path.join(self.params.save_path, "10_final_prediction.png")
