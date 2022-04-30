@@ -39,7 +39,7 @@ class ConvLSTMBlock(nn.Module):
             x = self.norm(h_t)
         if self.dropout:
             x = self.dout(x)
-        x = self.act(x)
+        # x = self.act(x)
         return x, c_t
 
 

@@ -26,6 +26,7 @@ class AxialDecoder(nn.Module):
                 # nn.BatchNorm2d(embedding_dim),
                 # nn.Dropout3d(0.1),
             # nn.LeakyReLU(0.2, inplace=True),
+            nn.GELU(),
             AxialAttention(
                 dim=embedding_dim,
                 dim_index=2,
@@ -33,6 +34,7 @@ class AxialDecoder(nn.Module):
                 dim_heads=16,
                 num_dimensions=3,
             ),
+            nn.GELU(),
                 # nn.LeakyReLU(0.2, inplace=True),
 
             )
