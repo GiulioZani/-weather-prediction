@@ -40,7 +40,7 @@ class BaseModel(LightningModule):
 
     def validation_epoch_end(self, outputs):
         avg_loss = t.stack([x["val_mse"] for x in outputs]).mean()
-        self.log("val_mse", avg_loss)
+        self.log("val_mse", avg_loss, prog_bar=True)
         t.save(
             self.state_dict(),
             os.path.join(self.params.save_path, "checkpoint.ckpt"),
