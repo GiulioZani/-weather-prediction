@@ -9,6 +9,10 @@ import ipdb
 import os
 
 
+def to_var(x):
+    return x[0, :, -1, 2].cpu()
+
+
 class BaseModel(LightningModule):
     def __init__(self, params: Namespace):
         super().__init__()
@@ -32,6 +36,8 @@ class BaseModel(LightningModule):
             pred = self.generator(context[:, : self.params.in_seq_len])
             context = t.cat((context, pred), dim=1)
         y_pred = context[:, -self.params.in_seq_len :]
+        if batch_idx == 0:
+            self.plot_predictions(x, y, y_pred, "train")
         # y_pred = self(x)out_seq_len
         # y = y[:, :, -1, 2]
         # y_pred = y_pred[:, :, -1, 2]
@@ -51,12 +57,12 @@ class BaseModel(LightningModule):
         self, batch: tuple[t.Tensor, t.Tensor], batch_idx: int
     ):
         x, y = batch
+        y_pred = self.generator(x, future_step=y.shape[1])
+        y_pred = y_pred[0] if isinstance(y_pred, tuple) else y_pred
         if batch_idx == 0:
             # visualize_predictions(x, y, self(x), path=self.params.save_path)
-            pass
-        pred_y = self.generator(x, future_step=y.shape[1])
-        pred_y = pred_y[0] if isinstance(pred_y, tuple) else pred_y
-        loss = F.mse_loss(pred_y, y)
+            self.plot_predictions(x, y, y_pred, "val")
+        loss = F.mse_loss(y_pred, y)
         return {"val_mse": loss}
 
     def configure_optimizers(self):
@@ -75,6 +81,38 @@ class BaseModel(LightningModule):
             "monitor": "val_mse",
         }
 
+    def plot_predictions(
+        self, x: t.Tensor, y: t.Tensor, pred_y: t.Tensor, title: str
+    ):
+        xs = t.arange(x.shape[1] + y.shape[1])
+        y = self.params.data_manager.denormalize(y.cuda()).cpu()
+        pred_y = self.params.data_manager.denormalize(pred_y.cuda()).cpu()
+        x = self.params.data_manager.denormalize(x.cuda()).cpu()
+        pred_y_city = pred_y[0, :, -1, 2].cpu()
+        y_city = y[0, :, -1, 2]
+        x_city = x[0, :, -1, 2]
+        plt.title(title)
+        plt.plot(xs[: x.shape[1]], x_city, label="input")
+        plt.plot(xs[x.shape[1] :], pred_y_city, label="prediction")
+        plt.plot(xs[x.shape[1] :], y_city, label="ground truth")
+        plt.legend()
+        plt.savefig(os.path.join(self.params.save_path, f"{title}.png"))
+        plt.close()
+        """
+        plt.plot(
+            xs[: self.params.test_seq_len],
+            pred_y_city[: self.params.test_seq_len],
+            label="prediction",
+        )
+        plt.plot(
+            xs[:10], y_city[:10], label="ground truth",
+        )
+        plt.legend()
+        plt.savefig(
+            os.path.join(self.params.save_path, "10_final_prediction.png")
+        )
+        """
+
     def plot_test(self):
         test_dl = self.trainer.test_dataloaders[0]
         for batch in test_dl:
@@ -82,32 +120,7 @@ class BaseModel(LightningModule):
             y = y[:, : self.params.in_seq_len]
             pred_y = self.generator(x.to(self.device), future_step=y.shape[1])
             pred_y = pred_y[0] if isinstance(pred_y, tuple) else pred_y
-
-            y = self.params.data_manager.denormalize(y.cuda()).cpu()
-            pred_y = self.params.data_manager.denormalize(pred_y.cuda()).cpu()
-
-            pred_y_city = pred_y[0, :, -1, 2].cpu()
-            y_city = y[0, :, -1, 2]
-            xs = t.arange(len(pred_y_city))
-            plt.plot(xs, pred_y_city, label="prediction")
-            plt.plot(xs, y_city, label="ground truth")
-            plt.legend()
-            plt.savefig(
-                os.path.join(self.params.save_path, "168_final_prediction.png")
-            )
-            plt.clf()
-            plt.plot(
-                xs[: self.params.test_seq_len],
-                pred_y_city[: self.params.test_seq_len],
-                label="prediction",
-            )
-            plt.plot(
-                xs[:10], y_city[:10], label="ground truth",
-            )
-            plt.legend()
-            plt.savefig(
-                os.path.join(self.params.save_path, "10_final_prediction.png")
-            )
+            self.plot_predictions(x, y, pred_y, "test")
             break
 
     def plot_importance_scores(self):
