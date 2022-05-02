@@ -33,15 +33,18 @@ class BaseModel(LightningModule):
     def training_step(self, batch: tuple[t.Tensor, t.Tensor], batch_idx: int):
         x, y = batch
         context = x
+        ipdb.set_trace()
         for _ in range(self.params.lag):
             pred = self.generator(context[:, : self.params.in_seq_len])
             context = t.cat((context, pred), dim=1)
         y_pred = context[:, -self.params.in_seq_len :]
         if batch_idx == 0:
-            self.plot_predictions(x, y, y_pred, "train", self.params.lag)
+            #self.plot_predictions(x, y, y_pred, "train", self.params.lag)
+            pass
         # y_pred = self(x)out_seq_len
         # y = y[:, :, -1, 2]
         # y_pred = y_pred[:, :, -1, 2]
+        ipdb.set_trace()
         loss = self.loss(y_pred.flatten(), y.flatten())
         return loss
 
@@ -54,15 +57,27 @@ class BaseModel(LightningModule):
         )
         return {"val_mse": avg_loss}
 
+    def predict(self, x, y):
+        context = x[:, :self.params.in_seq_len]
+        outputs = []
+        for i in range(y.shape[1]):
+            next_step = self.generator(context)
+            next_context_step = x[:, self.params.in_seq_len + i].unsqueeze(0)
+            next_context_step[0, 0, -1, 2] = next_step
+            outputs.append(next_step)
+            context = t.cat((context, next_context_step), dim=1)
+            context = context[:, -self.params.in_seq_len:]
+        y_pred = t.cat(outputs, dim=-1)
+        return y_pred
+
     def validation_step(
         self, batch: tuple[t.Tensor, t.Tensor], batch_idx: int
     ):
         x, y = batch
-        y_pred = self.generator(x, future_step=y.shape[1])
-        y_pred = y_pred[0] if isinstance(y_pred, tuple) else y_pred
+        y_pred = self.predict(x, y)
         if batch_idx == 0:
             # visualize_predictions(x, y, self(x), path=self.params.save_path)
-            self.plot_predictions(x, y, y_pred, "val", self.params.test_lag)
+            self.plot_predictions(x, y, y_pred, "val")
         loss = F.mse_loss(y_pred, y)
         return {"val_mse": loss}
 
@@ -85,21 +100,26 @@ class BaseModel(LightningModule):
         }
 
     def plot_predictions(
-            self, x: t.Tensor, y: t.Tensor, pred_y: t.Tensor, title: str, lag:int
+            self, x: t.Tensor, y: t.Tensor, pred_y: t.Tensor, title: str
     ):
-        xs = t.arange(x.shape[1] + y.shape[1])
+        x = x[0]
+        y = y[0]
+        pred_y = pred_y[0]
+        xs = t.arange(x.shape[0]) # + y.shape[1])
+        """
         y = self.params.data_manager.denormalize(y.detach().cuda()).cpu()
         pred_y = self.params.data_manager.denormalize(
             pred_y.detach().cuda()
         ).cpu()
         x = self.params.data_manager.denormalize(x.detach().cuda()).cpu()
-        pred_y_city = pred_y[0, :, -1, 2].cpu()
-        y_city = y[0, :, -1, 2]
-        x_city = x[0, :, -1, 2]
+        """
+        pred_y_city = pred_y.cpu() #pred_y[0, :, -1, 2].cpu()
+        y_city = y.cpu() #y[0, :, -1, 2]
+        x_city = x[:self.params.in_seq_len, -1, 2].cpu()
         plt.title(title)
-        plt.plot(xs[: x.shape[1]], x_city, label="input")
-        plt.plot(xs[lag :lag + pred_y_city.shape[0]], pred_y_city, label="prediction")
-        plt.plot(xs[lag :lag + pred_y_city.shape[0]], y_city, label="ground truth")
+        plt.plot(xs[: y.shape[0]], x_city, label="input")
+        plt.plot(xs[y.shape[0]:], pred_y_city, label="prediction")
+        plt.plot(xs[y.shape[0]:], y_city, label="ground truth")
         plt.legend()
         plt.savefig(os.path.join(self.params.save_path, f"{title}.png"))
         plt.close()
@@ -117,7 +137,7 @@ class BaseModel(LightningModule):
             os.path.join(self.params.save_path, "10_final_prediction.png")
         )
         """
-
+    """
     def plot_test(self):
         test_dl = self.trainer.test_dataloaders[0]
         for batch in test_dl:
@@ -125,8 +145,9 @@ class BaseModel(LightningModule):
             y = y[:, : self.params.in_seq_len]
             pred_y = self.generator(x.to(self.device), future_step=y.shape[1])
             pred_y = pred_y[0] if isinstance(pred_y, tuple) else pred_y
-            self.plot_predictions(x, y, pred_y, "test", self.params.test_lag)
+            self.plot_predictions(x, y, pred_y, "test")
             break
+    """
 
     def plot_importance_scores(self):
         importance_scores = self.generator.get_importance_scores()
@@ -145,13 +166,11 @@ class BaseModel(LightningModule):
 
     def test_step(self, batch: tuple[t.Tensor, t.Tensor], batch_idx: int):
         x, y = batch
-
+        y_pred = self.predict(x, y)
         if batch_idx == 0:
-            # visualize_predictions(x, y, self(x), path=self.params.save_path)
-            pass
-
-        pred_y = self.generator(x, future_step=y.shape[1])
-        return self.test_without_forward(y, pred_y)
+            self.plot_predictions(x, y, y_pred, "test")
+            
+        return self.test_without_forward(y, y_pred)
 
     def test_without_forward(self, y, pred_y):
         y_single = y  # [:, :, -1, 2]
@@ -166,11 +185,13 @@ class BaseModel(LightningModule):
             denorm_y,
             reduction="sum",  # [:, :, -1, 2],  # [:, :, -1, 2],
         )
+        """
         temp_ae = F.l1_loss(
             denorm_pred_y[:, :, -1, 2],
             denorm_y[:, :, -1, 2],
             reduction="sum",  # [:, :, -1, 2],  # [:, :, -1, 2],
         )
+        """
         mask_pred_y = self.params.data_manager.discretize(
             denorm_pred_y
         )  # , self.device)
@@ -186,18 +207,13 @@ class BaseModel(LightningModule):
             "fp": fp,
             "fn": fn,
             "tp": tp,
-            "temp_ae": temp_ae,
             "total_length": total_lengh,
-            "temp_length": denorm_y[:, :, -1, 2].numel(),
         }
 
     def test_epoch_end(self, outputs):
-        self.plot_test()
-        temp_lenght = sum([x["temp_length"] for x in outputs])
         total_lenght = sum([x["total_length"] for x in outputs])
         mse = t.stack([x["se"] for x in outputs]).sum() / total_lenght
         mae = t.stack([x["ae"] for x in outputs]).sum() / total_lenght
-        mae_temp = t.stack([x["temp_ae"] for x in outputs]).sum() / temp_lenght
         tn = t.stack([x["tn"] for x in outputs]).sum() / total_lenght
         fp = t.stack([x["fp"] for x in outputs]).sum() / total_lenght
         fn = t.stack([x["fn"] for x in outputs]).sum() / total_lenght
@@ -213,7 +229,6 @@ class BaseModel(LightningModule):
             "recall": recall,
             "accuracy": accuracy,
             "f1": f1,
-            "mae_temp": mae_temp,
         }
         test_metrics = {k: v for k, v in test_metrics.items()}
         self.log("test_performance", test_metrics, prog_bar=True)
