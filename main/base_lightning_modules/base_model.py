@@ -20,7 +20,8 @@ class BaseModel(LightningModule):
         self.save_hyperparameters()
         # self.data_manager = DataManger(data_path=params.data_location)
         self.generator = t.nn.Sequential()
-        self.loss = t.nn.MSELoss()
+        loss = t.nn.BCELoss()
+        self.loss = lambda x, y: loss(x.flatten(), y.flatten()) # t.nn.MSELoss()
 
     def forward(self, z: t.Tensor) -> t.Tensor:
         out = self.generator(z)
@@ -37,11 +38,11 @@ class BaseModel(LightningModule):
             context = t.cat((context, pred), dim=1)
         y_pred = context[:, -self.params.in_seq_len :]
         if batch_idx == 0:
-            self.plot_predictions(x, y, y_pred, "train")
+            self.plot_predictions(x, y, y_pred, "train", self.params.lag)
         # y_pred = self(x)out_seq_len
         # y = y[:, :, -1, 2]
         # y_pred = y_pred[:, :, -1, 2]
-        loss = self.loss(y_pred, y)
+        loss = self.loss(y_pred.flatten(), y.flatten())
         return loss
 
     def validation_epoch_end(self, outputs):
@@ -61,12 +62,14 @@ class BaseModel(LightningModule):
         y_pred = y_pred[0] if isinstance(y_pred, tuple) else y_pred
         if batch_idx == 0:
             # visualize_predictions(x, y, self(x), path=self.params.save_path)
-            self.plot_predictions(x, y, y_pred, "val")
+            self.plot_predictions(x, y, y_pred, "val", self.params.test_lag)
         loss = F.mse_loss(y_pred, y)
         return {"val_mse": loss}
 
     def configure_optimizers(self):
-        optimizer = t.optim.Adam(self.parameters(), lr=self.params.lr)
+        optimizer = t.optim.Adam(
+            self.parameters(), lr=self.params.lr, # weight_decay=0.01
+        )
         scheduler = t.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
             mode="min",
@@ -82,19 +85,21 @@ class BaseModel(LightningModule):
         }
 
     def plot_predictions(
-        self, x: t.Tensor, y: t.Tensor, pred_y: t.Tensor, title: str
+            self, x: t.Tensor, y: t.Tensor, pred_y: t.Tensor, title: str, lag:int
     ):
         xs = t.arange(x.shape[1] + y.shape[1])
-        y = self.params.data_manager.denormalize(y.cuda()).cpu()
-        pred_y = self.params.data_manager.denormalize(pred_y.cuda()).cpu()
-        x = self.params.data_manager.denormalize(x.cuda()).cpu()
+        y = self.params.data_manager.denormalize(y.detach().cuda()).cpu()
+        pred_y = self.params.data_manager.denormalize(
+            pred_y.detach().cuda()
+        ).cpu()
+        x = self.params.data_manager.denormalize(x.detach().cuda()).cpu()
         pred_y_city = pred_y[0, :, -1, 2].cpu()
         y_city = y[0, :, -1, 2]
         x_city = x[0, :, -1, 2]
         plt.title(title)
         plt.plot(xs[: x.shape[1]], x_city, label="input")
-        plt.plot(xs[x.shape[1] :], pred_y_city, label="prediction")
-        plt.plot(xs[x.shape[1] :], y_city, label="ground truth")
+        plt.plot(xs[lag :lag + pred_y_city.shape[0]], pred_y_city, label="prediction")
+        plt.plot(xs[lag :lag + pred_y_city.shape[0]], y_city, label="ground truth")
         plt.legend()
         plt.savefig(os.path.join(self.params.save_path, f"{title}.png"))
         plt.close()
@@ -120,7 +125,7 @@ class BaseModel(LightningModule):
             y = y[:, : self.params.in_seq_len]
             pred_y = self.generator(x.to(self.device), future_step=y.shape[1])
             pred_y = pred_y[0] if isinstance(pred_y, tuple) else pred_y
-            self.plot_predictions(x, y, pred_y, "test")
+            self.plot_predictions(x, y, pred_y, "test", self.params.test_lag)
             break
 
     def plot_importance_scores(self):
