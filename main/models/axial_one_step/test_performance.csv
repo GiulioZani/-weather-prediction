@@ -1,0 +1,2 @@
+model,mse,mae,precision,recall,accuracy,f1
+axial_one_step,0.0018623239593580365,22.16092300415039,0.0,nan,0.9900000095367432,nan

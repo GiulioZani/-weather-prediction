@@ -18,6 +18,7 @@ class Model(BaseModel):
         loss = self.loss(y_pred.squeeze(), y)
         return loss
 
+    """
     def test_step(self, batch, batch_idx: int):
         x, y = batch
         # shape of x is (batch_size, seq_len, stations, features)
@@ -26,3 +27,4 @@ class Model(BaseModel):
         # ipdb.set_trace()
 
         return self.test_without_forward(y, out)
+    """
