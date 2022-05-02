@@ -38,7 +38,6 @@ class CustomDataModule(LightningDataModule):
             dataset,
             batch_size=self.train_batch_size,
             drop_last=True,
-            num_workers=3,
             shuffle=True
         )
 
@@ -49,13 +48,13 @@ class CustomDataModule(LightningDataModule):
             in_seq_len=self.in_seq_len,
             # out_seq_len=self.test_seq_len,
             lag = self.params.test_lag,
+            test=True
         )
         return DataLoader(
             dataset,
             batch_size=self.test_batch_size,
             drop_last=True,
-            num_workers=3,
-            shuffle=True
+            shuffle=True,
         )
 
     def test_dataloader(self):
@@ -63,14 +62,14 @@ class CustomDataModule(LightningDataModule):
         dataset = CustomDataset(
             self.test_set,
             in_seq_len=self.in_seq_len,
-            # out_seq_len=self.test_seq_len,
             lag = self.params.test_lag,
+            # out_seq_len=self.test_seq_len,
+            test=True
         )
         return DataLoader(
             dataset,
             batch_size=self.test_batch_size,
             drop_last=True,
-            num_workers=3,
             shuffle=True
         )
 
@@ -84,7 +83,9 @@ class CustomDataset(Dataset):
         out_seq_len: int = -1,
         lag: int = -1,
         augment: bool = False,
+        test=False
     ):
+        self.test = test
         self.in_seq_len = in_seq_len
         self.out_seq_len = out_seq_len
         self.lag = lag
@@ -123,16 +124,27 @@ class CustomDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        x = (
-            self.data[idx, : self.in_seq_len]
-            if self.lag == -1
-            else self.data[idx, :-self.lag]
-        )
-        y = (
-            self.data[idx, -self.out_seq_len :]
-            if self.lag == -1
-            else self.data[idx, self.lag:]
-        )
+
+        if self.test:
+            x = self.data[idx, :].clone()
+            y = x[self.in_seq_len:, -1, 2].clone()
+            x[-self.in_seq_len:, -1, 2] = 0
+            """
+            x = (
+                self.data[idx, : self.in_seq_len]
+                if self.lag == -1
+                else self.data[idx, :-self.lag]
+            )
+            y = (
+                self.data[idx, -self.out_seq_len :]
+                if self.lag == -1
+                else self.data[idx, self.lag:]
+            )
+            """
+        else:
+            x = self.data[idx, : self.in_seq_len].clone()
+            y = x[-1, -1, 2].clone()
+            x[-1, 2] = 0
         return x, y
 
 
