@@ -121,9 +121,9 @@ class BaseModel(LightningModule):
         y_city = y.cpu()  # y[0, :, -1, 2]
         x_city = x[: self.params.in_seq_len, -1, 2].cpu()
         plt.title(title)
-        plt.plot(xs[: y.shape[0]], x_city, label="input")
-        plt.plot(xs[y.shape[0] :], pred_y_city.squeeze(), label="prediction")
-        plt.plot(xs[y.shape[0] :], y_city, label="ground truth")
+        plt.plot(xs[: x_city.shape[0]], x_city, label="input")
+        plt.plot(xs[x_city.shape[0] :], pred_y_city.squeeze(), label="prediction")
+        plt.plot(xs[x_city.shape[0] :], y_city, label="ground truth")
         plt.legend()
         plt.savefig(os.path.join(self.params.save_path, f"{title}.png"))
         plt.close()
