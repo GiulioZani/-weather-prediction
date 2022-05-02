@@ -21,7 +21,9 @@ class BaseModel(LightningModule):
         # self.data_manager = DataManger(data_path=params.data_location)
         self.generator = t.nn.Sequential()
         loss = t.nn.BCELoss()
-        self.loss = lambda x, y: loss(x.flatten(), y.flatten()) # t.nn.MSELoss()
+        self.loss = lambda x, y: loss(
+            x.flatten(), y.flatten()
+        )  # t.nn.MSELoss()
 
     def forward(self, z: t.Tensor) -> t.Tensor:
         out = self.generator(z)
@@ -39,7 +41,7 @@ class BaseModel(LightningModule):
             context = t.cat((context, pred), dim=1)
         y_pred = context[:, -self.params.in_seq_len :]
         if batch_idx == 0:
-            #self.plot_predictions(x, y, y_pred, "train", self.params.lag)
+            # self.plot_predictions(x, y, y_pred, "train", self.params.lag)
             pass
         # y_pred = self(x)out_seq_len
         # y = y[:, :, -1, 2]
@@ -58,7 +60,7 @@ class BaseModel(LightningModule):
         return {"val_mse": avg_loss}
 
     def predict(self, x, y):
-        context = x[:, :self.params.in_seq_len]
+        context = x[:, : self.params.in_seq_len]
         outputs = []
         for i in range(y.shape[1]):
             next_step = self.generator(context)
@@ -66,7 +68,7 @@ class BaseModel(LightningModule):
             next_context_step[0, 0, -1, 2] = next_step
             outputs.append(next_step)
             context = t.cat((context, next_context_step), dim=1)
-            context = context[:, -self.params.in_seq_len:]
+            context = context[:, -self.params.in_seq_len :]
         y_pred = t.cat(outputs, dim=-1)
         if x.shape[0] == 1:
             y_pred = y_pred.unsqueeze(0)
@@ -85,7 +87,7 @@ class BaseModel(LightningModule):
 
     def configure_optimizers(self):
         optimizer = t.optim.Adam(
-            self.parameters(), lr=self.params.lr, # weight_decay=0.01
+            self.parameters(), lr=self.params.lr,  # weight_decay=0.01
         )
         scheduler = t.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
@@ -102,12 +104,12 @@ class BaseModel(LightningModule):
         }
 
     def plot_predictions(
-            self, x: t.Tensor, y: t.Tensor, pred_y: t.Tensor, title: str
+        self, x: t.Tensor, y: t.Tensor, pred_y: t.Tensor, title: str
     ):
         x = x[0]
         y = y[0]
         pred_y = pred_y[0]
-        xs = t.arange(x.shape[0]) # + y.shape[1])
+        xs = t.arange(x.shape[0])  # + y.shape[1])
         """
         y = self.params.data_manager.denormalize(y.detach().cuda()).cpu()
         pred_y = self.params.data_manager.denormalize(
@@ -115,13 +117,13 @@ class BaseModel(LightningModule):
         ).cpu()
         x = self.params.data_manager.denormalize(x.detach().cuda()).cpu()
         """
-        pred_y_city = pred_y.cpu() #pred_y[0, :, -1, 2].cpu()
-        y_city = y.cpu() #y[0, :, -1, 2]
-        x_city = x[:self.params.in_seq_len, -1, 2].cpu()
+        pred_y_city = pred_y.cpu()  # pred_y[0, :, -1, 2].cpu()
+        y_city = y.cpu()  # y[0, :, -1, 2]
+        x_city = x[: self.params.in_seq_len, -1, 2].cpu()
         plt.title(title)
         plt.plot(xs[: y.shape[0]], x_city, label="input")
-        plt.plot(xs[y.shape[0]:], pred_y_city, label="prediction")
-        plt.plot(xs[y.shape[0]:], y_city, label="ground truth")
+        plt.plot(xs[y.shape[0] :], pred_y_city.squeeze(), label="prediction")
+        plt.plot(xs[y.shape[0] :], y_city, label="ground truth")
         plt.legend()
         plt.savefig(os.path.join(self.params.save_path, f"{title}.png"))
         plt.close()
@@ -139,6 +141,7 @@ class BaseModel(LightningModule):
             os.path.join(self.params.save_path, "10_final_prediction.png")
         )
         """
+
     """
     def plot_test(self):
         test_dl = self.trainer.test_dataloaders[0]
@@ -171,7 +174,7 @@ class BaseModel(LightningModule):
         y_pred = self.predict(x, y)
         if batch_idx == 0:
             self.plot_predictions(x, y, y_pred, "test")
-            
+
         return self.test_without_forward(y, y_pred)
 
     def test_without_forward(self, y, pred_y):
