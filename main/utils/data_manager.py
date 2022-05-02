@@ -1,4 +1,3 @@
-import h5py
 import torch as t
 import ipdb
 
@@ -28,11 +27,13 @@ class DataManager:
 
     def denormalize(self, data: t.Tensor) -> t.Tensor:
         result = data
+        min_val = self.min[0, 0, 2]
+        max_val = self.max[0, 0, 2]
         if self.norm_type == "minmax":
-            result = data * (self.max - self.min) + self.min
+            result = data * (max_val - min_val) + min_val
         elif type == "meanvar":
             result = data * self.var + self.mean
         return result
 
     def discretize(self, data: t.Tensor) -> t.Tensor:
-        return data > self.mean
+        return data > self.mean[0, 0, 2]
