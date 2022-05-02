@@ -68,6 +68,8 @@ class BaseModel(LightningModule):
             context = t.cat((context, next_context_step), dim=1)
             context = context[:, -self.params.in_seq_len:]
         y_pred = t.cat(outputs, dim=-1)
+        if x.shape[0] == 1:
+            y_pred = y_pred.unsqueeze(0)
         return y_pred
 
     def validation_step(
