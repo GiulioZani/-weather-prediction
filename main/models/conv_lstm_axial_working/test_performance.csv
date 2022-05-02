@@ -1,0 +1,2 @@
+model,mse,mae,precision,recall,accuracy,f1
+conv_lstm_final,0.0007938584312796593,12.464442253112793,nan,nan,1.0,nan
