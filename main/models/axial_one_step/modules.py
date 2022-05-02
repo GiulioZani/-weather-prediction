@@ -75,7 +75,8 @@ class EncoderDecoderEmbeddings(nn.Module):
             nn.LeakyReLU(0.2),
             nn.Linear(100, 64),
             nn.LeakyReLU(0.2),
-            nn.Linear(64, 1)
+            nn.Linear(64, 1),
+            nn.Sigmoid()
 
         )
 

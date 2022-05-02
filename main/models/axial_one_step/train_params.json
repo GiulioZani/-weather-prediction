@@ -14,7 +14,7 @@
     "gaussian_noise": 0.001,
     "in_seq_len": 10,
     "out_seq_len": 10,
-    "lag": 0,
+    "lag": 1,
     "test_lag": 10,
     "test_seq_len": 168,
     "max_epochs": 100,
