@@ -40,3 +40,7 @@ class AxialConv(nn.Module):
         x_1 = self.conv1(x)
         x_2 = self.conv2(x.transpose(0, 1, 3, 2)).transpose(0, 1, 3, 2)
         return F.relu(x_1 + x_2)
+
+    def get_attention_scores(self):
+        res = self.conv1.weight.detach().cpu().abs().mean(dim=1, keepdim=True), self.conv2.weight.detach().cpu().abs().mean(dim=1, keepdim=True)
+        return res

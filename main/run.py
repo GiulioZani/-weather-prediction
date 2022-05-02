@@ -91,6 +91,7 @@ def run():
         else:
             print("Ok, exiting.")
             return
+    print(model.generator)
     trainer = Trainer(
         max_epochs=params.max_epochs,
         gpus=(1 if params.cuda else None),
@@ -101,6 +102,7 @@ def run():
             # checkpoint_callback,
         ],
         logger=logger_module.CustomLogger(params),
+        enable_checkpointing=False
     )
     data_module = data_loader_module.CustomDataModule(params)
     if params.action in ("restart", "test"):

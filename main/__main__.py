@@ -1,6 +1,5 @@
 from .run import run
 
-
 def main():
     run()
 

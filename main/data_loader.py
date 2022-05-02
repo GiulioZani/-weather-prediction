@@ -27,17 +27,19 @@ class CustomDataModule(LightningDataModule):
         self.train_set = dataset[:-tot_length]
         self.train_batch_size = params.train_batch_size
         self.test_batch_size = params.test_batch_size
+        self.params = params
 
     def train_dataloader(self):
         # creates a DeepCoastalDataset object
         dataset = CustomDataset(
-            self.train_set, in_seq_len=self.in_seq_len, lag=1,
+            self.train_set, in_seq_len=self.in_seq_len, lag=self.params.lag,
         )
         return DataLoader(
             dataset,
             batch_size=self.train_batch_size,
             drop_last=True,
             num_workers=3,
+            shuffle=True
         )
 
     def val_dataloader(self):
@@ -45,13 +47,15 @@ class CustomDataModule(LightningDataModule):
         dataset = CustomDataset(
             self.test_set,
             in_seq_len=self.in_seq_len,
-            out_seq_len=self.test_seq_len,
+            # out_seq_len=self.test_seq_len,
+            lag = self.params.test_lag,
         )
         return DataLoader(
             dataset,
             batch_size=self.test_batch_size,
             drop_last=True,
             num_workers=3,
+            shuffle=True
         )
 
     def test_dataloader(self):
@@ -59,13 +63,15 @@ class CustomDataModule(LightningDataModule):
         dataset = CustomDataset(
             self.test_set,
             in_seq_len=self.in_seq_len,
-            out_seq_len=self.test_seq_len,
+            # out_seq_len=self.test_seq_len,
+            lag = self.params.test_lag,
         )
         return DataLoader(
             dataset,
             batch_size=self.test_batch_size,
             drop_last=True,
             num_workers=3,
+            shuffle=True
         )
 
 
@@ -120,12 +126,12 @@ class CustomDataset(Dataset):
         x = (
             self.data[idx, : self.in_seq_len]
             if self.lag == -1
-            else self.data[idx, :-1]
+            else self.data[idx, :-self.lag]
         )
         y = (
             self.data[idx, -self.out_seq_len :]
             if self.lag == -1
-            else self.data[idx, 1:]
+            else self.data[idx, self.lag:]
         )
         return x, y
 

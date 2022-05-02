@@ -1,0 +1,22 @@
+{
+    "model": "gat",
+    "cuda": true,
+    "train_batch_size": 10,
+    "test_batch_size": 50,
+    "imsize": 64,
+    "n_channels": 4,
+    "ngf": 64,
+    "ndf": 32,
+    "epochs": 10,
+    "lr": 0.0002,
+    "b1": 0.5,
+    "b2": 0.999,
+    "gaussian_noise_std": 0.1,
+    "in_seq_len": 8,
+    "out_seq_len": 8,
+    "max_epochs": 5,
+    "early_stopping_patience": 5,
+    "reduce_lr_on_plateau_patience": 5,
+    "data_location": "dataset/data.mat",
+    "crop": 64
+}
