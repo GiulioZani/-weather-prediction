@@ -62,9 +62,10 @@ class CustomDataModule(LightningDataModule):
         dataset = CustomDataset(
             self.test_set,
             in_seq_len=self.in_seq_len,
-            lag = self.params.test_lag,
+            lag = 168,#self.params.test_lag,
             # out_seq_len=self.test_seq_len,
-            test=True
+            test=True,
+            real_test=True
         )
         return DataLoader(
             dataset,
@@ -83,7 +84,8 @@ class CustomDataset(Dataset):
         out_seq_len: int = -1,
         lag: int = -1,
         augment: bool = False,
-        test=False
+        test=False,
+        real_test = False
     ):
         self.test = test
         self.in_seq_len = in_seq_len
@@ -99,25 +101,29 @@ class CustomDataset(Dataset):
             else (self.in_seq_len + lag)
         )
         data = data[: (len(data) // tot_lenght) * tot_lenght]
-        segments = (
-            (
-                t.stack(
+        if not real_test:
+            segments = (
+                (
+                    t.stack(
+                        tuple(
+                            data[i : i + tot_lenght]
+                            for i in range(len(data) - tot_lenght)
+                        )
+                    )
+                    if augment
+                    else data.reshape(-1, tot_lenght, data.shape[1], data.shape[2])
+                )
+                if lag == -1
+                else t.stack(
                     tuple(
                         data[i : i + tot_lenght]
                         for i in range(len(data) - tot_lenght)
                     )
                 )
-                if augment
-                else data.reshape(-1, tot_lenght, data.shape[1], data.shape[2])
             )
-            if lag == -1
-            else t.stack(
-                tuple(
-                    data[i : i + tot_lenght]
-                    for i in range(len(data) - tot_lenght)
-                )
-            )
-        )
+        else:
+            segments = data.view(1, tot_lenght, data.shape[1], data.shape[2])
+
         self.data = segments
 
     def __len__(self):
@@ -127,8 +133,9 @@ class CustomDataset(Dataset):
 
         if self.test:
             x = self.data[idx, :].clone()
-            y = x[self.in_seq_len:, -1, 2].clone()
-            x[-self.in_seq_len:, -1, 2] = 0
+            out_seq_len = x.shape[0] - self.in_seq_len
+            y = x[-out_seq_len:, -1, 2].clone()
+            x[-out_seq_len:, -1, 2] = 0
             """
             x = (
                 self.data[idx, : self.in_seq_len]
