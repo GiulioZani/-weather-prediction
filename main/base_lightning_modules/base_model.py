@@ -120,9 +120,11 @@ class BaseModel(LightningModule):
         pred_y_city = pred_y.cpu()  # pred_y[0, :, -1, 2].cpu()
         y_city = y.cpu()  # y[0, :, -1, 2]
         x_city = x[: self.params.in_seq_len, -1, 2].cpu()
-        plt.title(title)
+        plt.title(f"{self.params.model.replace('_', ' ')}")
         plt.plot(xs[: x_city.shape[0]], x_city, label="input")
-        plt.plot(xs[x_city.shape[0] :], pred_y_city.squeeze(), label="prediction")
+        plt.plot(
+            xs[x_city.shape[0] :], pred_y_city.squeeze(), label="prediction"
+        )
         plt.plot(xs[x_city.shape[0] :], y_city, label="ground truth")
         plt.legend()
         plt.savefig(os.path.join(self.params.save_path, f"{title}.png"))
@@ -190,6 +192,11 @@ class BaseModel(LightningModule):
             denorm_y,
             reduction="sum",  # [:, :, -1, 2],  # [:, :, -1, 2],
         )
+        ae_10 = F.l1_loss(
+            denorm_pred_y[:, :, :10],
+            denorm_y[:, :10],
+            reduction="sum",  # [:, :, -1, 2],  # [:, :, -1, 2],
+        )
         """
         temp_ae = F.l1_loss(
             denorm_pred_y[:, :, -1, 2],
@@ -212,6 +219,7 @@ class BaseModel(LightningModule):
             "fp": fp,
             "fn": fn,
             "tp": tp,
+            "ae_10": ae_10,
             "total_length": total_lengh,
         }
 
@@ -219,6 +227,7 @@ class BaseModel(LightningModule):
         total_lenght = sum([x["total_length"] for x in outputs])
         mse = t.stack([x["se"] for x in outputs]).sum() / total_lenght
         mae = t.stack([x["ae"] for x in outputs]).sum() / total_lenght
+        mae_10 = t.stack([x["ae_10"] for x in outputs]).sum() / 10 
         tn = t.stack([x["tn"] for x in outputs]).sum() / total_lenght
         fp = t.stack([x["fp"] for x in outputs]).sum() / total_lenght
         fn = t.stack([x["fn"] for x in outputs]).sum() / total_lenght
@@ -230,6 +239,7 @@ class BaseModel(LightningModule):
         test_metrics = {
             "mse": mse,
             "mae": mae,
+            "mae_10": mae_10,
             "precision": precision,
             "recall": recall,
             "accuracy": accuracy,
