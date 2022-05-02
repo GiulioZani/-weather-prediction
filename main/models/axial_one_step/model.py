@@ -11,22 +11,18 @@ class Model(BaseModel):
         super().__init__(params)
         self.generator = EncoderDecoderEmbeddings(params)
 
-
     def training_step(self, batch: tuple[t.Tensor, t.Tensor], batch_idx: int):
         x, y = batch
         # y = y[:, -1]  # we only care about last frame
-        y_pred = self.generator(x, future_step=y.shape[1])
+        y_pred = self.generator(x)
         loss = self.loss(y_pred.squeeze(), y)
         return loss
 
-
-
-    def test_step(self, batch, batch_idx:int):
+    def test_step(self, batch, batch_idx: int):
         x, y = batch
         # shape of x is (batch_size, seq_len, stations, features)
 
-       
-        out = self.generator(x, future_step=y.shape[1])
+        out = self.generator(x)
         # ipdb.set_trace()
 
         return self.test_without_forward(y, out)
