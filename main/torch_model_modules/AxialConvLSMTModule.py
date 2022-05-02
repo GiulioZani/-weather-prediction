@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch as t
 import torch.nn.functional as f
 
-from main.models.conv.model import GaussianNoise
 from .AxialConvLSMT import ConvLSTMCell
 
 
@@ -121,7 +120,7 @@ class EncoderDecoderConvLSTM(nn.Module):
             )
         )
 
-        self.gaussian_noise = GaussianNoise(0.00001)
+        # self.gaussian_noise = GaussianNoise(0.00001)
 
     def autoencoder(self, x, seq_len, future_step, h):
 
@@ -197,7 +196,7 @@ class EncoderDecoderConvLSTM(nn.Module):
 
         # find size of different input dimensions
 
-        x = self.gaussian_noise(x)
+        # x = self.gaussian_noise(x)
 
         b, seq_len, _, h, w = x.size()
 

@@ -15,9 +15,10 @@
     "in_seq_len": 10,
     "out_seq_len": 10,
     "test_seq_len": 168,
-    "max_epochs": 100,
-    "early_stopping_patience": 5,
-    "reduce_lr_on_plateau_patience": 2,
+    "max_epochs": 5,
+    "early_stopping_patience": 2,
+    "reduce_lr_on_plateau_patience": 0,
     "data_location": "dataset/data.mat",
+    "lag": 4,
     "crop": 64
 }

@@ -4,8 +4,8 @@ import torch.nn as nn
 import torch as t
 import torch.nn.functional as f
 
-from main.models.conv.model import GaussianNoise
 from main.torch_model_modules.ConvLSTM import ConvLSTMCell
+from main.torch_model_modules.components import GaussianNoise
 
 
 class ConvLSTMBlock(nn.Module):

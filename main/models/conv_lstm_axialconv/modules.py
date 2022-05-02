@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch as t
 import torch.nn.functional as f
 
-from main.models.conv.model import GaussianNoise
+from main.torch_model_modules.components import GaussianNoise
 from main.torch_model_modules.ConvLSTM import ConvLSTMCell
 from main.torch_model_modules.ConvLSTMModule import ConvLSTMBlock
 
@@ -122,7 +122,7 @@ class EncoderDecoderConvLSTM(nn.Module):
             encoder_vector = h[-1][0]
             outputs += [h[-1][0]]  # predictions
 
-        # ipdb.set_trace()
+        ipdb.set_trace()
 
         outputs = torch.stack(outputs, 1)
         # ipdb.set_trace()

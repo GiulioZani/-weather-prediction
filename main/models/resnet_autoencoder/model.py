@@ -162,10 +162,10 @@ class ResNet18Dec(nn.Module):
 class VAE(nn.Module):
     def __init__(self, params, z_dim=40):
         super().__init__()
-        self.encoder = ResNet18Enc(z_dim=z_dim, nc=6)
-        self.decoder = ResNet18Dec(z_dim=z_dim, nc=6)
+        self.encoder = ResNet18Enc(z_dim=z_dim, nc=10)
+        self.decoder = ResNet18Dec(z_dim=z_dim, nc=10)
 
-    def forward(self, x, t=None):
+    def forward(self, x, future_step=None):
         mean, logvar = self.encoder(x)
         z = self.reparameterize(mean, logvar)
         x = self.decoder(z)

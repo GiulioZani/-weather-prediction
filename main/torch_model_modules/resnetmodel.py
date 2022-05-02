@@ -8,7 +8,6 @@ import torchvision
 
 from numpy import prod
 from torch import nn, optim
-from dcgan.dense_layer import AVGPoolConcatDenseLayer
 
 from .conv2dmodel import GaussianNoise
 
@@ -106,13 +105,12 @@ class ResNetAutoEncoder(nn.Module):
         super().__init__()
         self.params = params
         self.in_planes = 64
-        self.is_probalistic = params[
-            "probalistic_gen"
-        ]  # if params['probalistic_gen']  != None else False
+        self.is_probalistic = False,
+        
         mlp = 1
 
         self.conv1 = nn.Conv2d(
-            self.params["out_seq_len"],
+            self.params.out_seq_len,
             64,
             kernel_size=3,
             stride=2,
@@ -122,8 +120,8 @@ class ResNetAutoEncoder(nn.Module):
         self.bn1 = nn.BatchNorm2d(64)
         self.l1 = self.make_encoder_layer(BasicBlockEnc, 64, num_blocks[0], stride=1)
 
-        if self.params["add_gaussian_noise_to_gen"]:
-            self.gaussianNoise = GaussianNoise(self.params["gaussian_noise_std"])
+        
+        self.gaussianNoise = GaussianNoise(0.0001)
 
         self.encoder = nn.Sequential(
             self.make_encoder_layer(BasicBlockEnc, 64, num_blocks[0], stride=1),
@@ -139,7 +137,7 @@ class ResNetAutoEncoder(nn.Module):
             self.make_decoder_layer(BasicBlockDec, 64, num_blocks[7], stride=2),
         )
         self.finalLayer = ResizeConv2d(
-            64, self.params["out_seq_len"], kernel_size=3, scale_factor=2
+            64, self.params.out_seq_len, kernel_size=3, scale_factor=1
         )
 
     def make_encoder_layer(self, BasicBlockEnc, planes, num_Blocks, stride):
@@ -163,25 +161,10 @@ class ResNetAutoEncoder(nn.Module):
         # ipdb.set_trace()
         x = x.squeeze(2)
 
-        if self.params["add_gaussian_noise_to_gen"]:
-            x = self.gaussianNoise(x)
+        
+        x = self.gaussianNoise(x)
 
-        if self.is_probalistic:
 
-            noise_matrix_w_h = self.params["nz"]
-            noise = t.randn(
-                self.params["generator_in_seq_len"], 1, noise_matrix_w_h
-            ).to(x.device)
-
-            x_concat = t.zeros(
-                (x.shape[0], x.shape[1], x.shape[2] + 1, x.shape[3] + noise_matrix_w_h)
-            ).to(x.device)
-            x_concat[:, :, : x.shape[2], : x.shape[3]] = x
-            x_concat[:, :, x.shape[2] :, x.shape[3] :] = noise
-            # x = x_concat
-            x = x_concat
-
-            # ipdb.set_trace()
         x = F.elu(self.bn1(self.conv1(x)))
         # ipdb.set_trace()
 
@@ -189,11 +172,8 @@ class ResNetAutoEncoder(nn.Module):
 
         x = self.decoder(x)
         x = nn.Sigmoid()(self.finalLayer(x))
-        if self.is_probalistic:
-            x = torchvision.transforms.functional.center_crop(
-                x, (self.params["imsize"], self.params["imsize"])
-            )
-
+    
+        ipdb.set_trace()
         return x.unsqueeze(2)
 
 
@@ -390,246 +370,3 @@ act_fn_by_name = {
     "gelu": nn.GELU,
 }
 
-
-class ResNetFrameDiscriminator(nn.Module):
-    def __init__(
-        self,
-        params,
-        num_blocks=[3, 3, 3],
-        c_hidden=[32, 64, 128],
-        act_fn_name="relu",
-        block_name="ResNetBlock",
-        outputblock="avgpool_plus_dense",
-        **kwargs
-    ):
-        """
-        Inputs:
-            num_classes - Number of classification outputs (10 for CIFAR10)
-            num_blocks - List with the number of ResNet blocks to use. The first block of each group uses downsampling, except the first.
-            c_hidden - List with the hidden dimensionalities in the different blocks. Usually multiplied by 2 the deeper we go.
-            act_fn_name - Name of the activation function to use, looked up in "act_fn_by_name"
-            block_name - Name of the ResNet block, looked up in "resnet_blocks_by_name"
-        """
-        super().__init__()
-        self.params = params
-        self.outputblock = outputblock
-
-        assert block_name in resnet_blocks_by_name
-        self.hparams = SimpleNamespace(
-            c_hidden=c_hidden,
-            num_blocks=num_blocks,
-            act_fn_name=act_fn_name,
-            act_fn=act_fn_by_name[act_fn_name],
-            block_class=resnet_blocks_by_name[block_name],
-        )
-        self._create_network()
-        self._init_params()
-
-    def _create_network(self):
-        c_hidden = self.hparams.c_hidden
-
-        # A first convolution on the original image to scale up the channel size
-        if (
-            self.hparams.block_class == PreActResNetBlock
-        ):  # => Don't apply non-linearity on output
-            self.input_net = nn.Sequential(
-                nn.Conv2d(
-                    self.params["out_seq_len"],
-                    c_hidden[0],
-                    kernel_size=3,
-                    padding=1,
-                    bias=False,
-                )
-            )
-        else:
-            self.input_net = nn.Sequential(
-                nn.Conv2d(
-                    self.params["out_seq_len"],
-                    c_hidden[0],
-                    kernel_size=3,
-                    padding=1,
-                    bias=False,
-                ),
-                nn.BatchNorm2d(c_hidden[0]),
-                self.hparams.act_fn(),
-            )
-
-        # Creating the ResNet blocks
-        blocks = []
-        for block_idx, block_count in enumerate(self.hparams.num_blocks):
-            for bc in range(block_count):
-                subsample = (
-                    bc == 0 and block_idx > 0
-                )  # Subsample the first block of each group, except the very first one.
-                blocks.append(
-                    self.hparams.block_class(
-                        c_in=c_hidden[block_idx if not subsample else (block_idx - 1)],
-                        act_fn=self.hparams.act_fn,
-                        subsample=subsample,
-                        c_out=c_hidden[block_idx],
-                    )
-                )
-        self.blocks = nn.Sequential(*blocks)
-
-        # Mapping to classification output
-        if self.outputblock == "avgpool_plus_dense":
-
-            self.output_net = AVGPoolConcatDenseLayer(self.params, c_hidden[-1], 16, 64)
-        else:
-            self.output_net = nn.Sequential(
-                nn.AdaptiveAvgPool2d((1, 1)),
-                nn.Flatten(),
-                nn.Linear(c_hidden[-1], 1),
-                nn.Sigmoid(),
-            )
-
-    def _init_params(self):
-        # Based on our discussion in Tutorial 4, we should initialize the convolutions according to the activation function
-        # Fan-out focuses on the gradient distribution, and is commonly used in ResNets
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(
-                    m.weight, mode="fan_out", nonlinearity=self.hparams.act_fn_name
-                )
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-
-    def forward(self, x):
-
-        # ipdb.set_trace()
-
-        # x = t.view
-        x = x.squeeze(2)
-
-        # noise_matrix_w_h = 12
-        # noise = t.randn( self.params['generator_in_seq_len'] , noise_matrix_w_h, noise_matrix_w_h)
-
-        # x_concat = t.zeros((x.shape[0], x.shape[1], x.shape[2]+ noise_matrix_w_h, x.shape[3]+ noise_matrix_w_h))
-        # x_concat[:,:,:x.shape[2], :x.shape[3]] = x
-        # x_concat[:,:,x.shape[2]:, x.shape[3]:] = noise
-
-        x = self.input_net(x)
-        x = self.blocks(x)
-        # ipdb.set_trace()
-
-        x = self.output_net(x)
-        return x.squeeze(1)
-
-
-class ResNetTemproalDiscriminator(nn.Module):
-    def __init__(
-        self,
-        params,
-        num_blocks=[3, 3, 3],
-        c_hidden=[32, 64, 128],
-        act_fn_name="relu",
-        block_name="ResNetBlock",
-        **kwargs
-    ):
-        """
-        Inputs:
-            num_classes - Number of classification outputs (10 for CIFAR10)
-            num_blocks - List with the number of ResNet blocks to use. The first block of each group uses downsampling, except the first.
-            c_hidden - List with the hidden dimensionalities in the different blocks. Usually multiplied by 2 the deeper we go.
-            act_fn_name - Name of the activation function to use, looked up in "act_fn_by_name"
-            block_name - Name of the ResNet block, looked up in "resnet_blocks_by_name"
-        """
-        super().__init__()
-        self.params = params
-
-        assert block_name in resnet_blocks_by_name
-        self.hparams = SimpleNamespace(
-            c_hidden=c_hidden,
-            num_blocks=num_blocks,
-            act_fn_name=act_fn_name,
-            act_fn=act_fn_by_name[act_fn_name],
-            block_class=resnet_blocks_by_name[block_name],
-        )
-        self._create_network()
-        self._init_params()
-
-    def _create_network(self):
-        c_hidden = self.hparams.c_hidden
-
-        # A first convolution on the original image to scale up the channel size
-        if (
-            self.hparams.block_class == PreActResNetBlock
-        ):  # => Don't apply non-linearity on output
-            self.input_net = nn.Sequential(
-                nn.Conv2d(
-                    self.params["out_seq_len"] + self.params["in_seq_len"],
-                    c_hidden[0],
-                    kernel_size=3,
-                    padding=1,
-                    bias=False,
-                )
-            )
-        else:
-            self.input_net = nn.Sequential(
-                nn.Conv2d(
-                    self.params["out_seq_len"] + self.params["in_seq_len"],
-                    c_hidden[0],
-                    kernel_size=3,
-                    padding=1,
-                    bias=False,
-                ),
-                nn.BatchNorm2d(c_hidden[0]),
-                self.hparams.act_fn(),
-            )
-
-        # Creating the ResNet blocks
-        blocks = []
-        for block_idx, block_count in enumerate(self.hparams.num_blocks):
-            for bc in range(block_count):
-                subsample = (
-                    bc == 0 and block_idx > 0
-                )  # Subsample the first block of each group, except the very first one.
-                blocks.append(
-                    self.hparams.block_class(
-                        c_in=c_hidden[block_idx if not subsample else (block_idx - 1)],
-                        act_fn=self.hparams.act_fn,
-                        subsample=subsample,
-                        c_out=c_hidden[block_idx],
-                    )
-                )
-        self.blocks = nn.Sequential(*blocks)
-
-        self.output_net = AVGPoolConcatDenseLayer(self.params, c_hidden[-1], 16, 128, 3)
-
-        # # Mapping to classification output
-        # self.output_net = nn.Sequential(
-        #     nn.AdaptiveAvgPool2d((1,1)),
-        #     nn.Flatten(),
-        #     nn.Linear(c_hidden[-1], 1),
-        #     nn.PReLU(),
-        #     nn.Sigmoid()
-        # )
-
-    def _init_params(self):
-        # Based on our discussion in Tutorial 4, we should initialize the convolutions according to the activation function
-        # Fan-out focuses on the gradient distribution, and is commonly used in ResNets
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(
-                    m.weight, mode="fan_out", nonlinearity=self.hparams.act_fn_name
-                )
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-
-    def forward(self, x):
-
-        x = x.squeeze(2)
-
-        # noise_matrix_w_h = 12
-        # noise = t.randn( self.params['generator_in_seq_len'] * 2, noise_matrix_w_h, noise_matrix_w_h)
-
-        # x_concat = t.zeros((x.shape[0], x.shape[1], x.shape[2]+ noise_matrix_w_h, x.shape[3]+ noise_matrix_w_h))
-        # x_concat[:,:,:x.shape[2], :x.shape[3]] = x
-        # x_concat[:,:,x.shape[2]:, x.shape[3]:] = noise
-        # ipdb.set_trace()
-        x = self.input_net(x)
-        x = self.blocks(x)
-        x = self.output_net(x)
-        return x.squeeze()

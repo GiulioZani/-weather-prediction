@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch as t
 
-from main.models.conv.model import GaussianNoise
+from main.torch_model_modules.components import GaussianNoise
 
 
 class ConvLSTMCell(nn.Module):
@@ -268,73 +268,11 @@ class EncoderDecoderConvLSTM(nn.Module):
             )
         )
 
-        self.gaussian_noise = GaussianNoise(0.00)
+        self.gaussian_noise = GaussianNoise(0.00001)
 
 
 
-    def predict(self, x, hidden = None):
-
-        x = x.unsqueeze(1)
-        
-        # ipdb.set_trace()
-        b, _, h, w = x.size()
-
-        if hidden == None:     
-            h_t, c_t = self.encoder_1_convlstm.init_hidden(batch_size=b, image_size=(h, w))
-            h_t2, c_t2 = self.encoder_2_convlstm.init_hidden(
-                batch_size=b, image_size=(h, w)
-            )
-            h_t3, c_t3 = self.decoder_1_convlstm.init_hidden(
-                batch_size=b, image_size=(h, w)
-            )
-            h_t4, c_t4 = self.decoder_2_convlstm.init_hidden(
-                batch_size=b, image_size=(h, w)
-            )
-            hidden = (h_t, c_t, h_t2, c_t2, h_t3, c_t3, h_t4, c_t4)
-        # ipdb.set_trace()
-        
-        return self.next(x, hidden)
-
-
-
-    def next(
-        self, x, h 
-    ):
-        # ipdb.set_trace()
-        (h_t, c_t, h_t2, c_t2, h_t3, c_t3, h_t4, c_t4) = h
-
-        # ipdb.set_trace()
-
-        # encoder
-        
-        h_t, c_t = self.encoder_1_convlstm(
-                input_tensor=x, cur_state=[h_t, c_t]
-            )  # we could concat to provide skip conn here
-        h_t2, c_t2 = self.encoder_2_convlstm(
-                input_tensor=h_t, cur_state=[h_t2, c_t2]
-            )  # we could concat to provide skip conn here
-
-        # encoder_vector
-        encoder_vector = h_t2
-
-        # decoder
-        h_t3, c_t3 = self.decoder_1_convlstm(
-                input_tensor=encoder_vector, cur_state=[h_t3, c_t3]
-            )  # we could concat to provide skip conn here
-        h_t4, c_t4 = self.decoder_2_convlstm(
-                input_tensor=h_t3, cur_state=[h_t4, c_t4]
-            )  # we could concat to provide skip conn here
-        encoder_vector = h_t4
-       
-        # ipdb.set_trace()
-        # decoder_output
-        encoder_vector = encoder_vector.unsqueeze(2)
-        output = self.decoder_CNN(encoder_vector)
-        output = torch.nn.Sigmoid()(output)
-        h = (h_t, c_t, h_t2, c_t2, h_t3, c_t3, h_t4, c_t4)
-
-        return output , h
-
+   
 
     def autoencoder(
         self, x, seq_len, future_step, h

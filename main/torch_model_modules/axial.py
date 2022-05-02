@@ -4,7 +4,7 @@ import torch.nn as nn
 from axial_attention import AxialAttention, AxialPositionalEmbedding
 import ipdb
 
-from main.models.conv.model import GaussianNoise
+from main.torch_model_modules.components import GaussianNoise
 
 class AxialDecoder(nn.Module):
     def __init__(self, params, embedding_dim, heads=16, dim_heads=16) -> None:

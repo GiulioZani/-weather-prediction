@@ -18,3 +18,4 @@ class Model(BaseModel):
         y_pred = self.generator(x)
         loss = self.loss(y_pred.squeeze(), y)
         return loss
+

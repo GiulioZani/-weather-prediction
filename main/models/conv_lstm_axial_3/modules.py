@@ -6,7 +6,7 @@ import torch.nn.functional as f
 
 from axial_attention import AxialAttention, AxialPositionalEmbedding
 
-from main.models.conv.model import GaussianNoise
+from main.torch_model_modules.components import GaussianNoise
 from main.torch_model_modules.ConvLSTM import ConvLSTMCell
 from main.torch_model_modules.ConvLSTMModule import ConvLSTMBlock
 from main.torch_model_modules.axial import AxialDecoder
@@ -96,7 +96,7 @@ class EncoderDecoderConvLSTM(nn.Module):
                 dim_heads=4,
                 num_dimensions=3,
             ),
-            nn.GELU(),
+            nn.Tanhshrink(),
         )
 
         self.lstm_axial_attention = nn.Sequential(
@@ -115,7 +115,7 @@ class EncoderDecoderConvLSTM(nn.Module):
                 dim_heads=4,
                 num_dimensions=3,
             ),
-            nn.GELU(),
+            nn.Tanhshrink(),
         )
 
         

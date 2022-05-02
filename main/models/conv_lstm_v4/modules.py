@@ -1,11 +1,13 @@
+import math
 import ipdb
 import torch
 import torch.nn as nn
 import torch as t
 import torch.nn.functional as f
 
-from main.models.conv.model import GaussianNoise
-from main.torch_model_modules.AxialConvLSMTModule import ConvLSTMBlock
+from main.torch_model_modules.ConvLSTMModule import ConvLSTMBlock
+from main.torch_model_modules.components import GaussianNoise
+
 
 
 class EncoderDecoderConvLSTM(nn.Module):
@@ -34,7 +36,7 @@ class EncoderDecoderConvLSTM(nn.Module):
                 8,
                 kernel_size=(3, 3),
                 bias=True,
-                dropout=False,
+                dropout=0.5,
                 batch_norm=False,
             ),
             ConvLSTMBlock(
@@ -42,7 +44,7 @@ class EncoderDecoderConvLSTM(nn.Module):
                 16,
                 kernel_size=(3, 3),
                 bias=True,
-                dropout=False,
+                dropout=0.5,
                 batch_norm=False,
             ),
             # ConvLSTMBlock(
@@ -56,7 +58,7 @@ class EncoderDecoderConvLSTM(nn.Module):
                 32,
                 kernel_size=(3, 3),
                 bias=True,
-                dropout=False,
+                dropout=0.5,
                 batch_norm=False,
             ),
             ConvLSTMBlock(
@@ -66,6 +68,7 @@ class EncoderDecoderConvLSTM(nn.Module):
                 bias=True,
                 dropout=False,
                 batch_norm=False,
+            
             ),
         ]
 
@@ -131,12 +134,17 @@ class EncoderDecoderConvLSTM(nn.Module):
 
         return outputs, h
 
-    def forward(self, x, hidden=None, future_step=None):
+    def forward(self, x, future_step=None):
 
         # ipdb.set_trace()
 
-        if future_step == None:
-            future_step = self.params.out_seq_len
+        if future_step != None and future_step != x.shape[1]:
+            return self.get_n_future_steps(x, future_step)
+        future_step = self.params.in_seq_len
+
+        if self.training:
+            x = self.gaussian_noise(x)
+
 
         x = x.unsqueeze(2)
 
@@ -153,13 +161,14 @@ class EncoderDecoderConvLSTM(nn.Module):
 
         # noise vector adding to channels
 
-        x = self.gaussian_noise(x)
+        # x = self.gaussian_noise(x)
 
         b, seq_len, _, h, w = x.size()
 
         # ipdb.set_trace()
 
         # initialize hidden states
+        hidden = None
         if hidden == None:
             hidden = []
             for i in range(len(self.conv_lstms)):
@@ -167,7 +176,7 @@ class EncoderDecoderConvLSTM(nn.Module):
                 hidden += [state]
 
         # autoencoder forward
-        outputs, h = self.autoencoder(x, seq_len, future_step, hidden)
+        outputs, _ = self.autoencoder(x, seq_len, future_step, hidden)
 
         # ipdb.set_trace()
 
@@ -175,4 +184,27 @@ class EncoderDecoderConvLSTM(nn.Module):
         # outputs = outputs.squeeze(2)
 
         # ipdb.set_trace()
-        return outputs, h
+        return outputs
+
+
+
+    def get_n_future_steps(self, x, future_step):
+
+        seq = future_step
+        future_steps = future_step
+        future_steps = math.ceil(future_steps / x.shape[1])
+        outs = []
+
+        for i in range(future_steps):
+            out = self(x)
+            x = out
+            outs += [out]
+
+        # ipdb.set_trace()
+        out = t.stack(outs, dim=1)
+        out = out.view(
+            x.shape[0], int(future_steps * x.shape[1]), x.shape[2], x.shape[3]
+        )
+        out = out[:, -seq:, :, :]
+
+        return out    

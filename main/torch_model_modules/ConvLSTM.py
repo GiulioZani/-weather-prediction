@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch as t
 
-from main.models.conv.model import GaussianNoise
+from main.torch_model_modules.components import GaussianNoise
 
 
 class ConvLSTMCell(nn.Module):
